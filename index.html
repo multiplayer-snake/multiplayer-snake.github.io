@@ -396,7 +396,7 @@
                 const player = this.players[playerId];
                 player.snake = this.initializeSnake();
                 player.direction = 'right';
-                player.score = Math.max(0, player.score - 5); // Penalty for dying
+                player.score = Math.max(0, player.score - 20); // Penalty for dying
             }
 
             disconnect() {
