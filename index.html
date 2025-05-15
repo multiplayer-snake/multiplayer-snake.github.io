@@ -3,471 +3,750 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Snake Game</title>
+    <title>Math Racing Game</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            font-family: 'Arial', sans-serif;
             background-color: #f0f0f0;
             margin: 0;
-            padding: 20px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
+        
+        .game-container {
+            width: 800px;
+            max-width: 95vw;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: white;
         }
-        #game-container {
-            position: relative;
-            margin: 20px 0;
-        }
-        canvas {
-            background-color: #222;
-            border: 2px solid #000;
-        }
-        #controls {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        button {
-            padding: 10px 15px;
-            margin: 0 5px;
-            font-size: 16px;
-            background-color: #4CAF50;
+        
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            background-color: #4a90e2;
             color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
+            padding: 8px 15px;
         }
-        button:hover {
-            background-color: #45a049;
+        
+        #gameArea {
+            position: relative;
+            height: 300px;
+            background: url('https://cdnjs.cloudflare.com/ajax/libs/simple-icons/3.0.1/placeholder.svg') repeat-x;
+            background-size: contain;
+            overflow: hidden;
+            border-bottom: 3px solid #333;
         }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
+        
+        .car {
+            position: absolute;
+            width: 60px;
+            height: 100px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            transition: transform 0.3s ease;
         }
-        #player-info {
-            margin-bottom: 20px;
+        
+        #playerCar {
+            bottom: 20px;
+            left: 50px;
+            background-color: red;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        
+        .npc-car {
+            background-color: blue;
+            border-radius: 10px;
+        }
+        
+        .lane {
+            position: absolute;
+            height: 100%;
+            width: 120px;
+            border-right: 3px dashed white;
+        }
+        
+        .game-controls {
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        #player-name {
-            padding: 8px;
-            font-size: 16px;
-            margin-bottom: 10px;
-            width: 200px;
-        }
-        #scoreboard {
-            border: 1px solid #333;
-            padding: 10px;
-            border-radius: 5px;
-            background-color: white;
-            width: 300px;
-            margin-bottom: 20px;
-        }
-        #scoreboard h2 {
-            margin: 0 0 10px 0;
-            text-align: center;
-        }
-        #players-list {
-            list-style-type: none;
-            padding: 0;
-        }
-        .player-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px;
-            border-bottom: 1px solid #eee;
-        }
-        .player-item:last-child {
-            border-bottom: none;
-        }
-        .color-indicator {
-            width: 15px;
-            height: 15px;
-            display: inline-block;
-            margin-right: 5px;
-            border-radius: 50%;
-        }
-        #connection-status {
-            margin-bottom: 10px;
+        
+        .question-container {
+            font-size: 24px;
             font-weight: bold;
-        }
-        #instructions {
-            background-color: white;
-            padding: 15px;
-            border-radius: 5px;
-            max-width: 600px;
-            margin-top: 20px;
-            border: 1px solid #ddd;
-        }
-        #instructions h2 {
-            margin-top: 0;
-        }
-        #instructions ul {
-            padding-left: 20px;
-        }
-        #server-url {
             margin-bottom: 15px;
             text-align: center;
         }
-        #server-input {
-            padding: 8px;
-            width: 300px;
-            margin-right: 10px;
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
         }
-        .disconnected {
-            color: red;
+        
+        #answer {
+            padding: 10px;
+            font-size: 18px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            width: 100px;
+            text-align: center;
         }
-        .connected {
+        
+        #submit {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        #submit:hover {
+            background-color: #45a049;
+        }
+        
+        #result {
+            font-size: 18px;
+            height: 24px;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .stats-container {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            background-color: #f8f8f8;
+            border-top: 1px solid #ddd;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        #speedometer {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .speed-indicator {
+            width: 15px;
+            height: 15px;
+            background-color: #ddd;
+            border-radius: 50%;
+        }
+        
+        .active {
+            background-color: #4CAF50;
+        }
+        
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+        }
+        
+        .screen-title {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+        
+        .screen-content {
+            font-size: 18px;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 80%;
+        }
+        
+        .button {
+            padding: 12px 24px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .button:hover {
+            background-color: #357abd;
+        }
+
+        .difficulty {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .difficulty button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .difficulty button.active {
+            background-color: #4a90e2;
+            color: white;
+        }
+
+        .correct {
             color: green;
+            font-weight: bold;
+            animation: pop 0.5s;
         }
-        .waiting {
-            color: orange;
+
+        .incorrect {
+            color: red;
+            font-weight: bold;
+            animation: shake 0.5s;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        
+        /* Hide game controls and stats when not in active gameplay */
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
-    <h1>Multiplayer Snake Game</h1>
-    
-    <div id="connection-status" class="disconnected">Disconnected</div>
-    
-    <div id="server-url">
-        <input type="text" id="server-input" placeholder="Enter server URL (e.g., https://your-server.onrender.com)">
-        <button id="connect-button">Connect</button>
-    </div>
-    
-    <div id="player-info">
-        <input type="text" id="player-name" placeholder="Enter your name" maxlength="15" disabled>
-        <button id="join-button" disabled>Join Game</button>
-    </div>
-    
-    <div id="scoreboard">
-        <h2>Players</h2>
-        <ul id="players-list"></ul>
-    </div>
-    
-    <div id="controls">
-        <button id="start-button" disabled>Start Game</button>
-        <button id="restart-button" disabled>Restart Game</button>
-    </div>
-    
-    <div id="game-container">
-        <canvas id="game-canvas" width="600" height="400"></canvas>
-    </div>
-    
-    <div id="instructions">
-        <h2>How to Play</h2>
-        <ul>
-            <li>Use arrow keys or WASD to control your snake</li>
-            <li>Collect food to grow longer</li>
-            <li>Avoid crashing into walls or other snakes</li>
-            <li>The longer you survive and the more food you collect, the higher your score</li>
-        </ul>
-        <h2>Setup Instructions</h2>
-        <ol>
-            <li>Enter the server URL and click "Connect"</li>
-            <li>Enter your name and click "Join Game"</li>
-            <li>Wait for other players to join</li>
-            <li>The host (first player to join) can start the game</li>
-            <li>Have fun!</li>
-        </ol>
+    <div class="game-container">
+        <div class="game-header">
+            <div id="timer">Time: 60s</div>
+            <div id="score">Score: 0</div>
+        </div>
+        
+        <div id="gameArea">
+            <!-- Lanes will be added dynamically -->
+            <div id="playerCar" class="car"></div>
+            
+            <!-- Start Screen -->
+            <div id="startScreen">
+                <h1 class="screen-title">Math Racing</h1>
+                <p class="screen-content">Answer math questions correctly to speed up your car and win the race!</p>
+                <div class="difficulty">
+                    <button id="easyBtn" class="active">Easy</button>
+                    <button id="mediumBtn">Medium</button>
+                    <button id="hardBtn">Hard</button>
+                </div>
+                <button id="startBtn" class="button">Start Game</button>
+            </div>
+            
+            <!-- Game Over Screen (initially hidden) -->
+            <div id="gameOverScreen" style="display:none;">
+                <h1 class="screen-title">Game Over</h1>
+                <p id="finalScore" class="screen-content">Your score: 0</p>
+                <p id="gameResult" class="screen-content"></p>
+                <button id="restartBtn" class="button">Play Again</button>
+            </div>
+        </div>
+        
+        <div id="gameControls" class="game-controls hidden">
+            <div id="question" class="question-container">Solve: 5 + 3 = ?</div>
+            <div class="input-container">
+                <input type="number" id="answer" placeholder="?" autofocus>
+                <button id="submit">Submit</button>
+            </div>
+            <div id="result"></div>
+        </div>
+        
+        <div id="statsContainer" class="stats-container hidden">
+            <div class="stat">
+                <div class="stat-label">Correct</div>
+                <div id="correctAnswers" class="stat-value">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Speed</div>
+                <div id="speedometer" class="stat-value">
+                    <div class="speed-indicator"></div>
+                    <div class="speed-indicator"></div>
+                    <div class="speed-indicator"></div>
+                    <div class="speed-indicator"></div>
+                    <div class="speed-indicator"></div>
+                </div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Position</div>
+                <div id="position" class="stat-value">4th</div>
+            </div>
+        </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
     <script>
-        // Game Configuration
+        // Game configuration
         const config = {
-            canvasWidth: 600,
-            canvasHeight: 400,
-            gridSize: 20,
-            backgroundColor: '#222',
-            foodColor: '#ff0000'
+            gameDuration: 60, // seconds
+            playerStartPosition: 50,
+            finishLine: 750,
+            lanes: 4,
+            maxSpeed: 5,
+            difficultyLevels: {
+                easy: {
+                    operations: ['+', '-'],
+                    minNum: 1,
+                    maxNum: 10,
+                    npcCount: 3,
+                    npcBaseSpeed: 1
+                },
+                medium: {
+                    operations: ['+', '-', '*'],
+                    minNum: 5,
+                    maxNum: 20,
+                    npcCount: 4,
+                    npcBaseSpeed: 2
+                },
+                hard: {
+                    operations: ['+', '-', '*', '/'],
+                    minNum: 10,
+                    maxNum: 50,
+                    npcCount: 5,
+                    npcBaseSpeed: 3
+                }
+            }
         };
 
-        // Game State
+        // Game state variables
         let gameState = {
-            isRunning: false,
-            isHost: false,
-            playerId: null,
-            playerName: '',
-            players: {},
-            food: { x: 0, y: 0 },
-            socket: null
+            isActive: false,
+            difficulty: 'easy',
+            timer: config.gameDuration,
+            score: 0,
+            correctAnswers: 0,
+            totalAnswers: 0,
+            playerPosition: config.playerStartPosition,
+            playerSpeed: 0,
+            npcs: [],
+            currentQuestion: null,
+            timerInterval: null,
+            gameLoop: null
         };
 
         // DOM Elements
-        const canvas = document.getElementById('game-canvas');
-        const context = canvas.getContext('2d');
-        const playerNameInput = document.getElementById('player-name');
-        const joinButton = document.getElementById('join-button');
-        const startButton = document.getElementById('start-button');
-        const restartButton = document.getElementById('restart-button');
-        const connectionStatus = document.getElementById('connection-status');
-        const playersList = document.getElementById('players-list');
-        const serverInput = document.getElementById('server-input');
-        const connectButton = document.getElementById('connect-button');
+        const dom = {
+            gameArea: document.getElementById('gameArea'),
+            playerCar: document.getElementById('playerCar'),
+            gameControls: document.getElementById('gameControls'),
+            statsContainer: document.getElementById('statsContainer'),
+            questionElement: document.getElementById('question'),
+            answerInput: document.getElementById('answer'),
+            submitButton: document.getElementById('submit'),
+            resultElement: document.getElementById('result'),
+            timerElement: document.getElementById('timer'),
+            scoreElement: document.getElementById('score'),
+            correctAnswersElement: document.getElementById('correctAnswers'),
+            positionElement: document.getElementById('position'),
+            speedometerElements: document.querySelectorAll('.speed-indicator'),
+            startScreen: document.getElementById('startScreen'),
+            gameOverScreen: document.getElementById('gameOverScreen'),
+            startButton: document.getElementById('startBtn'),
+            restartButton: document.getElementById('restartBtn'),
+            finalScoreElement: document.getElementById('finalScore'),
+            gameResultElement: document.getElementById('gameResult'),
+            difficultyButtons: {
+                easy: document.getElementById('easyBtn'),
+                medium: document.getElementById('mediumBtn'),
+                hard: document.getElementById('hardBtn')
+            }
+        };
 
-        // Try to get saved server URL from localStorage
-        const savedServerUrl = localStorage.getItem('snakeGameServerUrl');
-        if (savedServerUrl) {
-            serverInput.value = savedServerUrl;
+        // Initialize game
+        function initGame() {
+            createLanes();
+            setupEventListeners();
+
+            // Show start screen by default
+            dom.startScreen.style.display = 'flex';
+            dom.gameOverScreen.style.display = 'none';
+            
+            // Hide game controls and stats container initially
+            dom.gameControls.classList.add('hidden');
+            dom.statsContainer.classList.add('hidden');
         }
 
-        // Connect to server
-        connectButton.addEventListener('click', () => {
-            const serverUrl = serverInput.value.trim();
-            if (!serverUrl) {
-                alert('Please enter a server URL');
-                return;
+        // Create lane dividers
+        function createLanes() {
+            for (let i = 1; i < config.lanes; i++) {
+                const lane = document.createElement('div');
+                lane.className = 'lane';
+                lane.style.left = `${i * (100 / config.lanes)}%`;
+                dom.gameArea.appendChild(lane);
             }
-            
-            // Save to localStorage for next time
-            localStorage.setItem('snakeGameServerUrl', serverUrl);
-            
-            // Update status
-            connectionStatus.textContent = "Connecting...";
-            connectionStatus.className = "waiting";
-            
-            // Disconnect existing socket if any
-            if (gameState.socket) {
-                gameState.socket.disconnect();
-            }
-            
-            try {
-                // Connect to server
-                gameState.socket = io(serverUrl);
-                setupSocketListeners();
-                
-                // Enable player name input
-                playerNameInput.disabled = false;
-            } catch (error) {
-                connectionStatus.textContent = "Connection Failed: " + error.message;
-                connectionStatus.className = "disconnected";
-            }
-        });
+        }
 
-        // Event Listeners
-        joinButton.addEventListener('click', () => {
-            const playerName = playerNameInput.value.trim();
-            if (playerName && gameState.socket) {
-                gameState.socket.emit('join', { name: playerName });
-                playerNameInput.disabled = true;
-                joinButton.disabled = true;
-                gameState.playerName = playerName;
-            }
-        });
-
-        startButton.addEventListener('click', () => {
-            if (gameState.socket) {
-                gameState.socket.emit('start_game');
-                startButton.disabled = true;
-            }
-        });
-
-        restartButton.addEventListener('click', () => {
-            if (gameState.socket) {
-                gameState.socket.emit('restart_game');
-                restartButton.disabled = true;
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (!gameState.isRunning || !gameState.socket) return;
-            
-            let direction;
-            switch (e.key) {
-                case 'ArrowUp':
-                case 'w':
-                case 'W':
-                    direction = 'up';
-                    break;
-                case 'ArrowDown':
-                case 's':
-                case 'S':
-                    direction = 'down';
-                    break;
-                case 'ArrowLeft':
-                case 'a':
-                case 'A':
-                    direction = 'left';
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                case 'D':
-                    direction = 'right';
-                    break;
-                default:
-                    return;
-            }
-            
-            // Send direction update
-            gameState.socket.emit('update_direction', { direction });
-        });
-
-        // Setup Socket.io event listeners
-        function setupSocketListeners() {
-            const socket = gameState.socket;
-            
-            socket.on('connect', () => {
-                connectionStatus.textContent = "Connected";
-                connectionStatus.className = "connected";
-                joinButton.disabled = false;
+        // Setup event listeners
+        function setupEventListeners() {
+            // Submit answer via button or enter key
+            dom.submitButton.addEventListener('click', submitAnswer);
+            dom.answerInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    submitAnswer();
+                }
             });
-
-            socket.on('disconnect', () => {
-                connectionStatus.textContent = "Disconnected";
-                connectionStatus.className = "disconnected";
-                gameState.isRunning = false;
-                playerNameInput.disabled = false;
-                joinButton.disabled = true;
-                startButton.disabled = true;
-                restartButton.disabled = true;
+            
+            // Start and restart buttons
+            dom.startButton.addEventListener('click', startGame);
+            dom.restartButton.addEventListener('click', () => {
+                dom.gameOverScreen.style.display = 'none';
+                dom.startScreen.style.display = 'flex';
+                // Hide game controls and stats when going back to start screen
+                dom.gameControls.classList.add('hidden');
+                dom.statsContainer.classList.add('hidden');
+                resetGame();
             });
-
-            socket.on('player_joined', (data) => {
-                gameState.players = data.players;
-                
-                // If we received our player ID, save it
-                if (data.id) {
-                    gameState.playerId = data.id;
-                    gameState.isHost = data.isHost;
+            
+            // Difficulty selection
+            Object.keys(dom.difficultyButtons).forEach(difficulty => {
+                dom.difficultyButtons[difficulty].addEventListener('click', () => {
+                    // Update active class
+                    Object.values(dom.difficultyButtons).forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    dom.difficultyButtons[difficulty].classList.add('active');
                     
-                    if (gameState.isHost) {
-                        startButton.disabled = false;
-                    }
-                }
-                
-                updatePlayersList();
-            });
-
-            socket.on('player_left', (data) => {
-                gameState.players = data.players;
-                updatePlayersList();
-            });
-
-            socket.on('host_assigned', () => {
-                gameState.isHost = true;
-                if (!gameState.isRunning) {
-                    startButton.disabled = false;
-                }
-            });
-
-            socket.on('game_started', (data) => {
-                gameState.isRunning = true;
-                gameState.food = data.food;
-                restartButton.disabled = false;
-            });
-
-            socket.on('game_restarted', (data) => {
-                gameState.players = data.players;
-                gameState.food = data.food;
-                updatePlayersList();
-                if (gameState.isHost) {
-                    restartButton.disabled = false;
-                }
-            });
-
-            socket.on('game_updated', (data) => {
-                gameState.players = data.players;
-                gameState.food = data.food;
-                
-                updatePlayersList();
-                drawGame();
-            });
-
-            socket.on('food_collected', (data) => {
-                gameState.players = data.players;
-                gameState.food = data.food;
-                
-                updatePlayersList();
+                    // Set difficulty
+                    gameState.difficulty = difficulty;
+                });
             });
         }
 
-        // Game Functions
-        function updatePlayersList() {
-            playersList.innerHTML = '';
+        // Start the game
+        function startGame() {
+            gameState.isActive = true;
+            dom.startScreen.style.display = 'none';
             
-            for (const playerId in gameState.players) {
-                const player = gameState.players[playerId];
-                const playerItem = document.createElement('li');
-                playerItem.className = 'player-item';
-                
-                const colorIndicator = document.createElement('span');
-                colorIndicator.className = 'color-indicator';
-                colorIndicator.style.backgroundColor = player.color;
-                
-                const playerName = document.createElement('span');
-                playerName.textContent = player.name + (playerId === gameState.playerId ? ' (You)' : '') + (player.id === Object.keys(gameState.players)[0] ? ' (Host)' : '');
-                
-                const playerScore = document.createElement('span');
-                playerScore.textContent = 'Score: ' + player.score;
-                
-                playerItem.appendChild(colorIndicator);
-                playerItem.appendChild(playerName);
-                playerItem.appendChild(playerScore);
-                playersList.appendChild(playerItem);
-            }
+            // Show game controls and stats when game starts
+            dom.gameControls.classList.remove('hidden');
+            dom.statsContainer.classList.remove('hidden');
+            
+            // Reset game state for new game
+            resetGame();
+            
+            // Create NPCs based on difficulty
+            createNPCs();
+            
+            // Start the timer
+            gameState.timerInterval = setInterval(updateTimer, 1000);
+            
+            // Start the game loop
+            gameState.gameLoop = setInterval(gameLoop, 50);
+            
+            // Generate first question
+            generateQuestion();
+            
+            // Focus on the answer input
+            dom.answerInput.focus();
         }
 
-        function drawGame() {
-            // Clear canvas
-            context.fillStyle = config.backgroundColor;
-            context.fillRect(0, 0, canvas.width, canvas.height);
+        // Reset game state
+        function resetGame() {
+            gameState.timer = config.gameDuration;
+            gameState.score = 0;
+            gameState.correctAnswers = 0;
+            gameState.totalAnswers = 0;
+            gameState.playerPosition = config.playerStartPosition;
+            gameState.playerSpeed = 0;
+            gameState.npcs = [];
             
-            // Draw food
-            if (gameState.food) {
-                context.fillStyle = config.foodColor;
-                context.fillRect(gameState.food.x, gameState.food.y, config.gridSize, config.gridSize);
-            }
+            // Clear any existing NPCs
+            const npcElements = document.querySelectorAll('.npc-car');
+            npcElements.forEach(element => element.remove());
             
-            // Draw snakes
-            for (const playerId in gameState.players) {
-                const player = gameState.players[playerId];
-                context.fillStyle = player.color;
+            // Reset UI
+            updateUI();
+        }
+
+        // Create NPC cars
+        function createNPCs() {
+            const diffSettings = config.difficultyLevels[gameState.difficulty];
+            
+            // Create NPCs for each lane except the player's lane
+            for (let i = 0; i < diffSettings.npcCount; i++) {
+                // Assign a random lane to each NPC
+                const lane = i % config.lanes; // Distribute NPCs across lanes
                 
-                // Draw each segment of the snake
-                player.snake.forEach((segment, index) => {
-                    if (index === 0) {
-                        // Draw head
-                        context.fillRect(segment.x, segment.y, config.gridSize, config.gridSize);
-                        
-                        // Draw eyes for the head
-                        context.fillStyle = '#000';
-                        const eyeSize = 4;
-                        switch (player.direction) {
-                            case 'up':
-                                context.fillRect(segment.x + 4, segment.y + 4, eyeSize, eyeSize);
-                                context.fillRect(segment.x + 12, segment.y + 4, eyeSize, eyeSize);
-                                break;
-                            case 'down':
-                                context.fillRect(segment.x + 4, segment.y + 12, eyeSize, eyeSize);
-                                context.fillRect(segment.x + 12, segment.y + 12, eyeSize, eyeSize);
-                                break;
-                            case 'left':
-                                context.fillRect(segment.x + 4, segment.y + 4, eyeSize, eyeSize);
-                                context.fillRect(segment.x + 4, segment.y + 12, eyeSize, eyeSize);
-                                break;
-                            case 'right':
-                                context.fillRect(segment.x + 12, segment.y + 4, eyeSize, eyeSize);
-                                context.fillRect(segment.x + 12, segment.y + 12, eyeSize, eyeSize);
-                                break;
-                        }
-                        
-                        context.fillStyle = player.color;
-                    } else {
-                        // Draw body segments
-                        context.fillRect(segment.x, segment.y, config.gridSize, config.gridSize);
-                    }
+                // Create NPC car element
+                const npcElement = document.createElement('div');
+                npcElement.className = 'car npc-car';
+                npcElement.style.bottom = '20px';
+                npcElement.style.left = `${50 + lane * (100 / config.lanes)}px`;
+                dom.gameArea.appendChild(npcElement);
+                
+                // Add NPC to game state
+                gameState.npcs.push({
+                    element: npcElement,
+                    position: config.playerStartPosition - 20 - (Math.random() * 50), // Start slightly behind the player
+                    lane: lane,
+                    speed: diffSettings.npcBaseSpeed + (Math.random() * 0.5) // Base speed + small random variation
                 });
             }
         }
 
-        // Initial draw
-        drawGame();
+        // Generate a math question based on current difficulty
+        function generateQuestion() {
+            const diffSettings = config.difficultyLevels[gameState.difficulty];
+            const operation = diffSettings.operations[Math.floor(Math.random() * diffSettings.operations.length)];
+            
+            let num1, num2, answer;
+            
+            // Ensure the numbers and result make sense for the operation
+            switch (operation) {
+                case '+':
+                    num1 = getRandomInt(diffSettings.minNum, diffSettings.maxNum);
+                    num2 = getRandomInt(diffSettings.minNum, diffSettings.maxNum);
+                    answer = num1 + num2;
+                    break;
+                case '-':
+                    num1 = getRandomInt(diffSettings.minNum, diffSettings.maxNum);
+                    num2 = getRandomInt(diffSettings.minNum, Math.min(num1, diffSettings.maxNum));
+                    answer = num1 - num2;
+                    break;
+                case '*':
+                    // Keep multiplication factors smaller
+                    num1 = getRandomInt(diffSettings.minNum, Math.floor(Math.sqrt(diffSettings.maxNum) * 2));
+                    num2 = getRandomInt(2, Math.min(10, diffSettings.maxNum / num1));
+                    answer = num1 * num2;
+                    break;
+                case '/':
+                    // Ensure clean division
+                    num2 = getRandomInt(2, 10);
+                    answer = getRandomInt(1, Math.floor(diffSettings.maxNum / num2));
+                    num1 = answer * num2;
+                    break;
+            }
+            
+            gameState.currentQuestion = {
+                text: `${num1} ${operation} ${num2} = ?`,
+                answer: answer
+            };
+            
+            dom.questionElement.textContent = `Solve: ${gameState.currentQuestion.text}`;
+        }
+
+        // Handle answer submission
+        function submitAnswer() {
+            if (!gameState.isActive) return;
+            
+            const userAnswer = parseInt(dom.answerInput.value);
+            
+            // Clear the input field
+            dom.answerInput.value = '';
+            dom.answerInput.focus();
+            
+            // Skip if no answer provided
+            if (isNaN(userAnswer)) return;
+            
+            gameState.totalAnswers++;
+            
+            // Check if answer is correct
+            if (userAnswer === gameState.currentQuestion.answer) {
+                // Correct answer
+                gameState.correctAnswers++;
+                gameState.score += 10 * (gameState.difficulty === 'easy' ? 1 : gameState.difficulty === 'medium' ? 2 : 3);
+                
+                // Increase player speed (up to max)
+                gameState.playerSpeed = Math.min(config.maxSpeed, gameState.playerSpeed + 1);
+                
+                // Show result
+                dom.resultElement.textContent = 'Correct! Speed up!';
+                dom.resultElement.className = 'correct';
+            } else {
+                // Wrong answer
+                gameState.playerSpeed = Math.max(0, gameState.playerSpeed - 1);
+                
+                // Show result
+                dom.resultElement.textContent = `Wrong! Answer was ${gameState.currentQuestion.answer}`;
+                dom.resultElement.className = 'incorrect';
+            }
+            
+            // Generate a new question
+            generateQuestion();
+            
+            // Update UI
+            updateUI();
+        }
+
+        // Main game loop
+        function gameLoop() {
+            if (!gameState.isActive) return;
+            
+            // Move player based on speed
+            gameState.playerPosition += gameState.playerSpeed;
+            
+            // Check if player has reached finish line
+            if (gameState.playerPosition >= config.finishLine) {
+                endGame(true);
+                return;
+            }
+            
+            // Move NPCs
+            moveNPCs();
+            
+            // Update positions on screen
+            updatePositions();
+            
+            // Update player rank
+            updatePlayerRank();
+            
+            // Update UI
+            updateUI();
+        }
+
+        // Move NPC cars
+        function moveNPCs() {
+            gameState.npcs.forEach(npc => {
+                // Move NPC based on its speed
+                npc.position += npc.speed;
+                
+                // Check if any NPC has reached finish line
+                if (npc.position >= config.finishLine) {
+                    endGame(false);
+                }
+            });
+        }
+
+        // Update positions on screen
+        function updatePositions() {
+            // Update player car position
+            const playerProgressPercent = Math.min(100, (gameState.playerPosition / config.finishLine) * 100);
+            dom.playerCar.style.left = `${playerProgressPercent}%`;
+            
+            // Update NPC car positions
+            gameState.npcs.forEach(npc => {
+                const npcProgressPercent = Math.min(100, (npc.position / config.finishLine) * 100);
+                npc.element.style.left = `${npcProgressPercent}%`;
+            });
+        }
+
+        // Update player's rank (position in race)
+        function updatePlayerRank() {
+            // Count how many NPCs are ahead of the player
+            let npcAhead = 0;
+            gameState.npcs.forEach(npc => {
+                if (npc.position > gameState.playerPosition) {
+                    npcAhead++;
+                }
+            });
+            
+            // Set player position (1st, 2nd, etc.)
+            const position = npcAhead + 1;
+            const positionText = position === 1 ? '1st' : 
+                                position === 2 ? '2nd' : 
+                                position === 3 ? '3rd' : 
+                                `${position}th`;
+            
+            dom.positionElement.textContent = positionText;
+        }
+
+        // Update timer
+        function updateTimer() {
+            gameState.timer--;
+            
+            if (gameState.timer <= 0) {
+                endGame(false);
+            }
+            
+            dom.timerElement.textContent = `Time: ${gameState.timer}s`;
+        }
+
+        // End the game
+        function endGame(playerWon) {
+            gameState.isActive = false;
+            
+            // Clear intervals
+            clearInterval(gameState.timerInterval);
+            clearInterval(gameState.gameLoop);
+            
+            // Determine final position
+            updatePlayerRank();
+            
+            // Hide game controls and stats container when game ends
+            dom.gameControls.classList.add('hidden');
+            dom.statsContainer.classList.add('hidden');
+            
+            // Show game over screen
+            dom.gameOverScreen.style.display = 'flex';
+            dom.finalScoreElement.textContent = `Final Score: ${gameState.score}`;
+            
+            // Set game result message
+            if (playerWon) {
+                dom.gameResultElement.textContent = "Congratulations! You won the race!";
+            } else {
+                const position = dom.positionElement.textContent;
+                dom.gameResultElement.textContent = `You finished in ${position} place.`;
+            }
+        }
+
+        // Update UI elements
+        function updateUI() {
+            // Update score
+            dom.scoreElement.textContent = `Score: ${gameState.score}`;
+            
+            // Update correct answers
+            dom.correctAnswersElement.textContent = gameState.correctAnswers;
+            
+            // Update speedometer
+            const speedIndicators = Array.from(dom.speedometerElements);
+            speedIndicators.forEach((indicator, index) => {
+                if (index < gameState.playerSpeed) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+        }
+
+        // Helper function to get random integer between min and max (inclusive)
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // Initialize the game when the page loads
+        window.onload = initGame;
     </script>
 </body>
 </html>
