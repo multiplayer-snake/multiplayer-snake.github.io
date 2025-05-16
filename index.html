@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Snake Game Mobile</title>
+  <title>Snake Game</title>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
@@ -19,13 +19,12 @@
       height: 100vh;
       width: 100vw;
       overflow: hidden;
-      touch-action: none;
     }
     #game-container {
       position: relative;
       width: 100%;
       max-width: 95vmin;
-      max-height: 70vh;
+      max-height: 80vh;
       aspect-ratio: 1 / 1;
     }
     canvas {
@@ -39,64 +38,24 @@
       margin: 10px 0;
       font-size: 6vmin;
     }
-    #controls {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(3, 1fr);
-      gap: 5px;
-      width: 80vmin;
-      max-width: 95%;
-      aspect-ratio: 1 / 1;
-      margin-top: 20px;
-    }
-    .control-btn {
-      background-color: rgba(0, 255, 0, 0.2);
-      border: 1px solid #0f0;
-      border-radius: 5px;
-      color: #0f0;
-      font-size: 24px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      touch-action: manipulation;
-    }
-    .control-btn:active {
-      background-color: rgba(0, 255, 0, 0.5);
-    }
-    #up-btn { grid-column: 2; grid-row: 1; }
-    #left-btn { grid-column: 1; grid-row: 2; }
-    #pause-btn { grid-column: 2; grid-row: 2; }
-    #right-btn { grid-column: 3; grid-row: 2; }
-    #down-btn { grid-column: 2; grid-row: 3; }
-    #start-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.7);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 10;
-    }
-    #start-btn {
-      background-color: #0f0;
-      color: #000;
-      border: none;
-      padding: 15px 30px;
-      font-size: 24px;
-      border-radius: 5px;
-      margin-top: 20px;
-      font-family: 'Courier New', Courier, monospace;
-      font-weight: bold;
-    }
     .game-info {
       margin-top: 10px;
       text-align: center;
       font-size: 18px;
       color: #00E8FF;
+    }
+    #device-info {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      color: rgba(0, 255, 0, 0.5);
+      font-size: 12px;
+    }
+    #instruction {
+      margin-top: 10px;
+      color: #0f0;
+      text-align: center;
+      font-size: 16px;
     }
   </style>
 </head>
@@ -105,11 +64,6 @@
   
   <div id="game-container">
     <canvas id="game"></canvas>
-    <div id="start-screen">
-      <h2>Snake Game</h2>
-      <p>Tap to control direction</p>
-      <button id="start-btn">START GAME</button>
-    </div>
   </div>
   
   <div class="game-info">
@@ -118,33 +72,41 @@
     <span id="level-display">Level: 1</span>
   </div>
   
-  <div id="controls">
-    <button id="up-btn" class="control-btn">⬆️</button>
-    <button id="left-btn" class="control-btn">⬅️</button>
-    <button id="pause-btn" class="control-btn">⏸️</button>
-    <button id="right-btn" class="control-btn">➡️</button>
-    <button id="down-btn" class="control-btn">⬇️</button>
-  </div>
-
-<script>
-  // Prevent scrolling when touching the canvas
-  document.body.addEventListener('touchstart', function(e) {
-    if (e.target.tagName !== 'BUTTON') {
-      e.preventDefault();
-    }
-  }, { passive: false });
+  <div id="instruction"></div>
+  <div id="device-info"></div>
   
-  document.body.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-  }, { passive: false });
+<script>
+  // Device detection
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && 
+                   (window.innerWidth <= 800 || window.orientation !== undefined);
+  
+  // Display device type (can be removed in final version)
+  document.getElementById('device-info').textContent = isMobile ? 'Mobile Device Detected' : 'Laptop/Desktop Detected';
+  
+  // Set instruction text based on device
+  const instructionEl = document.getElementById('instruction');
+  if (isMobile) {
+    instructionEl.textContent = 'Tap on screen to direct the snake';
+  } else {
+    instructionEl.textContent = 'Use arrow keys to control. Press P to pause';
+  }
+  
+  // Prevent scrolling when touching the canvas on mobile
+  if (isMobile) {
+    document.body.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+    }, { passive: false });
+    
+    document.body.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+    }, { passive: false });
+  }
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const scoreDisplay = document.getElementById('score-display');
   const livesDisplay = document.getElementById('lives-display');
   const levelDisplay = document.getElementById('level-display');
-  const startScreen = document.getElementById('start-screen');
-  const startBtn = document.getElementById('start-btn');
   
   // Set canvas size based on its display size
   function resizeCanvas() {
@@ -166,7 +128,6 @@
   let paused = false;
   let speed = 1000;
   let interval;
-  let lastDirection = null;
 
   function initGame() {
     // Calculate grid based on canvas size
@@ -178,10 +139,9 @@
     score = 0;
     lives = 6;
     level = 1;
-    speed = 150; // Slightly slower for mobile
+    speed = isMobile ? 120 : 90; // Slightly slower for mobile
     started = false;
     paused = false;
-    lastDirection = null;
     
     updateDisplay();
     
@@ -226,14 +186,14 @@
       updateDisplay();
       
       if (lives <= 0) {
-        showGameOver();
+        alert(`Game Over! Final Score: ${score}, Level: ${level}`);
+        initGame();
         return;
       } else {
-        showLifeLost();
+        alert(`Oops! Lives remaining: ${lives}`);
         snake = [{x: Math.floor(tileCount/2), y: Math.floor(tileCount/2)}];
         velocity = {x: 0, y: 0};
         started = false;
-        lastDirection = null;
         return;
       }
     }
@@ -249,7 +209,7 @@
       if (score % 5 === 0) {
         level++;
         updateDisplay();
-        speed = Math.max(60, speed - 15);
+        speed = Math.max(50, speed - 10);
         clearInterval(interval);
         interval = setInterval(gameLoop, speed);
       }
@@ -293,179 +253,114 @@
       ctx.font = "bold " + Math.floor(canvas.width / 10) + "px Courier New";
       ctx.textAlign = "center";
       ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+      ctx.font = "bold " + Math.floor(canvas.width / 20) + "px Courier New";
+      if (isMobile) {
+        ctx.fillText('Tap to resume', canvas.width / 2, canvas.height / 2 + 30);
+      } else {
+        ctx.fillText('Press P to resume', canvas.width / 2, canvas.height / 2 + 30);
+      }
+    }
+    
+    // Show start message if not started
+    if (!started && !paused) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00E8FF';
+      ctx.font = "bold " + Math.floor(canvas.width / 15) + "px Courier New";
+      ctx.textAlign = "center";
+      ctx.fillText('PRESS TO START', canvas.width / 2, canvas.height / 2);
     }
   }
 
-  function showGameOver() {
-    clearInterval(interval);
-    startScreen.style.display = 'flex';
-    startScreen.innerHTML = `
-      <h2>Game Over!</h2>
-      <p>Final Score: ${score}</p>
-      <p>Level: ${level}</p>
-      <button id="start-btn">PLAY AGAIN</button>
-    `;
-    document.getElementById('start-btn').addEventListener('click', function() {
-      startScreen.style.display = 'none';
-      initGame();
+  // Mobile touch controls - direct snake to tap location
+  if (isMobile) {
+    canvas.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      
+      // Toggle pause if already paused
+      if (paused) {
+        paused = false;
+        return;
+      }
+      
+      if (!started) {
+        started = true;
+      }
+      
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      
+      // Convert touch position to grid coordinates
+      const touchX = Math.floor((touch.clientX - rect.left) / (canvas.width / tileCount));
+      const touchY = Math.floor((touch.clientY - rect.top) / (canvas.height / tileCount));
+      
+      // Get current head position
+      const head = snake[0];
+      
+      // Determine direction to move based on tap location
+      const diffX = touchX - head.x;
+      const diffY = touchY - head.y;
+      
+      // If the absolute difference in X is greater than Y, move horizontally
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        velocity = {x: diffX > 0 ? 1 : -1, y: 0};
+      } else {
+        velocity = {x: 0, y: diffY > 0 ? 1 : -1};
+      }
+    });
+    
+    // Double tap to pause
+    let lastTap = 0;
+    canvas.addEventListener('touchend', function(e) {
+      const curTime = new Date().getTime();
+      const tapLength = curTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        paused = !paused;
+        e.preventDefault();
+      }
+      lastTap = curTime;
+    });
+  } 
+  // Laptop keyboard controls
+  else {
+    document.addEventListener('keydown', e => {
+      if (e.key === 'p' || e.key === 'P') {
+        paused = !paused;
+        return;
+      }
+
+      if (!started) started = true;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          if (velocity.y === 0) velocity = {x: 0, y: -1};
+          break;
+        case 'ArrowDown':
+          if (velocity.y === 0) velocity = {x: 0, y: 1};
+          break;
+        case 'ArrowLeft':
+          if (velocity.x === 0) velocity = {x: -1, y: 0};
+          break;
+        case 'ArrowRight':
+          if (velocity.x === 0) velocity = {x: 1, y: 0};
+          break;
+      }
+    });
+    
+    // Start game with click too
+    canvas.addEventListener('click', function() {
+      if (!started) {
+        started = true;
+      }
+      
+      if (paused) {
+        paused = false;
+      }
     });
   }
 
-  function showLifeLost() {
-    startScreen.style.display = 'flex';
-    startScreen.innerHTML = `
-      <h2>Oops!</h2>
-      <p>Lives remaining: ${lives}</p>
-      <button id="start-btn">CONTINUE</button>
-    `;
-    document.getElementById('start-btn').addEventListener('click', function() {
-      startScreen.style.display = 'none';
-      started = true;
-    });
-  }
-
-  // Control buttons
-  document.getElementById('up-btn').addEventListener('click', function() {
-    if (lastDirection !== 'down') {
-      velocity = {x: 0, y: -1};
-      lastDirection = 'up';
-      if (!started) started = true;
-    }
-  });
-  
-  document.getElementById('down-btn').addEventListener('click', function() {
-    if (lastDirection !== 'up') {
-      velocity = {x: 0, y: 1};
-      lastDirection = 'down';
-      if (!started) started = true;
-    }
-  });
-  
-  document.getElementById('left-btn').addEventListener('click', function() {
-    if (lastDirection !== 'right') {
-      velocity = {x: -1, y: 0};
-      lastDirection = 'left';
-      if (!started) started = true;
-    }
-  });
-  
-  document.getElementById('right-btn').addEventListener('click', function() {
-    if (lastDirection !== 'left') {
-      velocity = {x: 1, y: 0};
-      lastDirection = 'right';
-      if (!started) started = true;
-    }
-  });
-  
-  document.getElementById('pause-btn').addEventListener('click', function() {
-    paused = !paused;
-    this.textContent = paused ? '▶️' : '⏸️';
-  });
-  
-  // Swipe controls
-  let touchStartX = 0;
-  let touchStartY = 0;
-  
-  document.addEventListener('touchstart', function(e) {
-    touchStartX = e.changedTouches[0].screenX;
-    touchStartY = e.changedTouches[0].screenY;
-  }, false);
-  
-  document.addEventListener('touchend', function(e) {
-    let touchEndX = e.changedTouches[0].screenX;
-    let touchEndY = e.changedTouches[0].screenY;
-    
-    processTouch(touchStartX, touchStartY, touchEndX, touchEndY);
-  }, false);
-  
-  function processTouch(startX, startY, endX, endY) {
-    let diffX = endX - startX;
-    let diffY = endY - startY;
-    
-    // Minimum swipe distance
-    if (Math.abs(diffX) < 20 && Math.abs(diffY) < 20) return;
-    
-    if (!started) started = true;
-    
-    // Determine swipe direction
-    if (Math.abs(diffX) > Math.abs(diffY)) {
-      // Horizontal swipe
-      if (diffX > 0 && lastDirection !== 'left') {
-        velocity = {x: 1, y: 0};
-        lastDirection = 'right';
-      } else if (diffX < 0 && lastDirection !== 'right') {
-        velocity = {x: -1, y: 0};
-        lastDirection = 'left';
-      }
-    } else {
-      // Vertical swipe
-      if (diffY > 0 && lastDirection !== 'up') {
-        velocity = {x: 0, y: 1};
-        lastDirection = 'down';
-      } else if (diffY < 0 && lastDirection !== 'down') {
-        velocity = {x: 0, y: -1};
-        lastDirection = 'up';
-      }
-    }
-  }
-  
-  // Start button
-  startBtn.addEventListener('click', function() {
-    startScreen.style.display = 'none';
-    initGame();
-  });
-
-  // Keyboard controls (for tablets with keyboards)
-  document.addEventListener('keydown', e => {
-    if (e.key === 'p' || e.key === 'P') {
-      paused = !paused;
-      document.getElementById('pause-btn').textContent = paused ? '▶️' : '⏸️';
-      return;
-    }
-
-    if (!started) started = true;
-
-    switch (e.key) {
-      case 'ArrowUp':
-      case 'w':
-      case 'W':
-        if (lastDirection !== 'down') {
-          velocity = {x: 0, y: -1};
-          lastDirection = 'up';
-        }
-        break;
-      case 'ArrowDown':
-      case 's':
-      case 'S':
-        if (lastDirection !== 'up') {
-          velocity = {x: 0, y: 1};
-          lastDirection = 'down';
-        }
-        break;
-      case 'ArrowLeft':
-      case 'a':
-      case 'A':
-        if (lastDirection !== 'right') {
-          velocity = {x: -1, y: 0};
-          lastDirection = 'left';
-        }
-        break;
-      case 'ArrowRight':
-      case 'd':
-      case 'D':
-        if (lastDirection !== 'left') {
-          velocity = {x: 1, y: 0};
-          lastDirection = 'right';
-        }
-        break;
-    }
-  });
-
-  // Initialize without starting game
-  resizeCanvas();
+  // Initialize the game
   initGame();
-  clearInterval(interval);
-  draw();
 </script>
 
 </body>
