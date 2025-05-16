@@ -14,7 +14,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      height: 103vh;
       flex-direction: column;
     }
     canvas {
@@ -27,12 +27,12 @@
   </style>
 </head>
 <body>
-  <canvas id="game" width="520" height="520"></canvas>
+  <canvas id="game" width="560" height="560"></canvas>
 <script>
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
 
-  const gridSize = 20;
+  const gridSize = 16;
   const tileCount = canvas.width / gridSize;
 
   let snake, velocity, food, score, lives, level;
@@ -48,7 +48,7 @@
     score = 0;
     lives = 6;
     level = 1;
-    speed = 100;
+    speed = 90;
     started = false;
     paused = false;
     clearInterval(interval);
