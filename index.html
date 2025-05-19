@@ -2,127 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Snake Game</title>
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 0;
       background-color: #111;
       color: #0f0;
       font-family: 'Courier New', Courier, monospace;
       display: flex;
-      flex-direction: column;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      width: 100vw;
-      overflow: hidden;
-    }
-    #game-container {
-      position: relative;
-      width: 100%;
-      max-width: 95vmin;
-      max-height: 80vh;
-      aspect-ratio: 1 / 1;
+      height: 101vh;
+      flex-direction: column;
     }
     canvas {
       border: 2px solid #0f0;
       background-color: #000;
-      width: 100%;
-      height: 100%;
-      display: block;
     }
     h1 {
-      margin: 10px 0;
-      font-size: 6vmin;
-    }
-    .game-info {
-      margin-top: 10px;
-      text-align: center;
-      font-size: 18px;
-      color: #00E8FF;
-    }
-    #device-info {
-      position: absolute;
-      top: 5px;
-      left: 5px;
-      color: rgba(0, 255, 0, 0.5);
-      font-size: 12px;
-    }
-    #instruction {
-      margin-top: 10px;
-      color: #0f0;
-      text-align: center;
-      font-size: 16px;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>SNAKE</h1>
-  
-  <div id="game-container">
-    <canvas id="game"></canvas>
-  </div>
-  
-  <div class="game-info">
-    <span id="score-display">Score: 0</span> | 
-    <span id="lives-display">Lives: 6</span> | 
-    <span id="level-display">Level: 1</span>
-  </div>
-  
-  <div id="instruction"></div>
-  <div id="device-info"></div>
-  
+  <canvas id="game" width="560" height="560"></canvas>
 <script>
-  // Device detection
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && 
-                   (window.innerWidth <= 800 || window.orientation !== undefined);
-  
-  // Display device type (can be removed in final version)
-  document.getElementById('device-info').textContent = isMobile ? 'Mobile Device Detected' : 'Laptop/Desktop Detected';
-  
-  // Set instruction text based on device
-  const instructionEl = document.getElementById('instruction');
-  if (isMobile) {
-    instructionEl.textContent = 'Tap on screen to direct the snake';
-  } else {
-    instructionEl.textContent = 'Use arrow keys to control. Press P to pause';
-  }
-  
-  // Prevent scrolling when touching the canvas on mobile
-  if (isMobile) {
-    document.body.addEventListener('touchstart', function(e) {
-      e.preventDefault();
-    }, { passive: false });
-    
-    document.body.addEventListener('touchmove', function(e) {
-      e.preventDefault();
-    }, { passive: false });
-  }
-
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-  const scoreDisplay = document.getElementById('score-display');
-  const livesDisplay = document.getElementById('lives-display');
-  const levelDisplay = document.getElementById('level-display');
-  
-  // Set canvas size based on its display size
-  function resizeCanvas() {
-    const container = document.getElementById('game-container');
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
-  }
-  
-  resizeCanvas();
-  window.addEventListener('resize', function() {
-    resizeCanvas();
-    draw(); // Redraw when resizing
-  });
 
-  const gridSize = 20;
-  let tileCount;
+  const gridSize = 16;
+  const tileCount = canvas.width / gridSize;
+
   let snake, velocity, food, score, lives, level;
   let started = false;
   let paused = false;
@@ -130,43 +42,24 @@
   let interval;
 
   function initGame() {
-    // Calculate grid based on canvas size
-    tileCount = Math.floor(canvas.width / gridSize);
-    
-    snake = [{x: Math.floor(tileCount/2), y: Math.floor(tileCount/2)}];
+    snake = [{x: 20, y: 20}];
     velocity = {x: 0, y: 0};
     food = spawnFood();
     score = 0;
     lives = 6;
     level = 1;
-    speed = isMobile ? 120 : 90; // Slightly slower for mobile
+    speed = 90;
     started = false;
     paused = false;
-    
-    updateDisplay();
-    
     clearInterval(interval);
     interval = setInterval(gameLoop, speed);
-    draw();
   }
 
   function spawnFood() {
-    // Make sure food doesn't spawn on snake
-    let newFood;
-    do {
-      newFood = {
-        x: Math.floor(Math.random() * tileCount),
-        y: Math.floor(Math.random() * tileCount)
-      };
-    } while (snake.some(part => part.x === newFood.x && part.y === newFood.y));
-    
-    return newFood;
-  }
-
-  function updateDisplay() {
-    scoreDisplay.textContent = `Score: ${score}`;
-    livesDisplay.textContent = `Lives: ${lives}`;
-    levelDisplay.textContent = `Level: ${level}`;
+    return {
+      x: Math.floor(Math.random() * tileCount),
+      y: Math.floor(Math.random() * tileCount)
+    };
   }
 
   function gameLoop() {
@@ -180,18 +73,15 @@
     if (
       head.x < 0 || head.y < 0 ||
       head.x >= tileCount || head.y >= tileCount ||
-      snake.slice(1).some(part => part.x === head.x && part.y === head.y)
+      snake.some(part => part.x === head.x && part.y === head.y)
     ) {
       lives--;
-      updateDisplay();
-      
       if (lives <= 0) {
         alert(`Game Over! Final Score: ${score}, Level: ${level}`);
-        initGame();
-        return;
+        return initGame();
       } else {
         alert(`Oops! Lives remaining: ${lives}`);
-        snake = [{x: Math.floor(tileCount/2), y: Math.floor(tileCount/2)}];
+        snake = [{x: 10, y: 10}];
         velocity = {x: 0, y: 0};
         started = false;
         return;
@@ -202,17 +92,16 @@
 
     if (head.x === food.x && head.y === food.y) {
       score++;
-      updateDisplay();
       food = spawnFood();
 
       // Level up every 5 points
       if (score % 5 === 0) {
         level++;
-        updateDisplay();
-        speed = Math.max(50, speed - 10);
+        speed = Math.max(50, speed - 20);
         clearInterval(interval);
         interval = setInterval(gameLoop, speed);
       }
+
     } else {
       snake.pop();
     }
@@ -221,145 +110,52 @@
   }
 
   function draw() {
-    // Clear canvas
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Calculate actual grid size (might be smaller than original gridSize)
-    const actualGridSize = canvas.width / tileCount;
 
     // Draw food
     ctx.fillStyle = '#f00';
-    ctx.fillRect(food.x * actualGridSize, food.y * actualGridSize, actualGridSize, actualGridSize);
+    ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
 
     // Draw snake
     ctx.fillStyle = '#0f0';
-    for (let i = 0; i < snake.length; i++) {
-      const part = snake[i];
-      // Head is slightly different color
-      if (i === 0) {
-        ctx.fillStyle = '#00ff55';
-      } else {
-        ctx.fillStyle = '#0f0';
-      }
-      ctx.fillRect(part.x * actualGridSize, part.y * actualGridSize, actualGridSize, actualGridSize);
+    for (let part of snake) {
+      ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize, gridSize);
     }
 
-    // Show paused message on canvas
-    if (paused) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#00E8FF';
-      ctx.font = "bold " + Math.floor(canvas.width / 10) + "px Courier New";
-      ctx.textAlign = "center";
-      ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
-      ctx.font = "bold " + Math.floor(canvas.width / 20) + "px Courier New";
-      if (isMobile) {
-        ctx.fillText('Tap to resume', canvas.width / 2, canvas.height / 2 + 30);
-      } else {
-        ctx.fillText('Press P to resume', canvas.width / 2, canvas.height / 2 + 30);
-      }
-    }
-    
-    // Show start message if not started
-    if (!started && !paused) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#00E8FF';
-      ctx.font = "bold " + Math.floor(canvas.width / 15) + "px Courier New";
-      ctx.textAlign = "center";
-      ctx.fillText('PRESS TO START', canvas.width / 2, canvas.height / 2);
-    }
+    // UI
+    ctx.fillStyle = '#00E8FF';
+    ctx.font = "16px Courier New";
+    ctx.fillText(`Score: ${score}`, 10, canvas.height - 10);
+    ctx.fillText(`Lives: ${lives}`, 100, canvas.height - 10);
+    ctx.fillText(`Level: ${level}`, 180, canvas.height - 10);
+    if (paused) ctx.fillText(`PAUSED`, 300, canvas.height - 10);
   }
 
-  // Mobile touch controls - direct snake to tap location
-  if (isMobile) {
-    canvas.addEventListener('touchstart', function(e) {
-      e.preventDefault();
-      
-      // Toggle pause if already paused
-      if (paused) {
-        paused = false;
-        return;
-      }
-      
-      if (!started) {
-        started = true;
-      }
-      
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      
-      // Convert touch position to grid coordinates
-      const touchX = Math.floor((touch.clientX - rect.left) / (canvas.width / tileCount));
-      const touchY = Math.floor((touch.clientY - rect.top) / (canvas.height / tileCount));
-      
-      // Get current head position
-      const head = snake[0];
-      
-      // Determine direction to move based on tap location
-      const diffX = touchX - head.x;
-      const diffY = touchY - head.y;
-      
-      // If the absolute difference in X is greater than Y, move horizontally
-      if (Math.abs(diffX) > Math.abs(diffY)) {
-        velocity = {x: diffX > 0 ? 1 : -1, y: 0};
-      } else {
-        velocity = {x: 0, y: diffY > 0 ? 1 : -1};
-      }
-    });
-    
-    // Double tap to pause
-    let lastTap = 0;
-    canvas.addEventListener('touchend', function(e) {
-      const curTime = new Date().getTime();
-      const tapLength = curTime - lastTap;
-      if (tapLength < 300 && tapLength > 0) {
-        paused = !paused;
-        e.preventDefault();
-      }
-      lastTap = curTime;
-    });
-  } 
-  // Laptop keyboard controls
-  else {
-    document.addEventListener('keydown', e => {
-      if (e.key === 'p' || e.key === 'P') {
-        paused = !paused;
-        return;
-      }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'p' || e.key === 'p') {
+      paused = !paused;
+      return;
+    }
 
-      if (!started) started = true;
+    if (!started) started = true;
 
-      switch (e.key) {
-        case 'ArrowUp':
-          if (velocity.y === 0) velocity = {x: 0, y: -1};
-          break;
-        case 'ArrowDown':
-          if (velocity.y === 0) velocity = {x: 0, y: 1};
-          break;
-        case 'ArrowLeft':
-          if (velocity.x === 0) velocity = {x: -1, y: 0};
-          break;
-        case 'ArrowRight':
-          if (velocity.x === 0) velocity = {x: 1, y: 0};
-          break;
-      }
-    });
-    
-    // Start game with click too
-    canvas.addEventListener('click', function() {
-      if (!started) {
-        started = true;
-      }
-      
-      if (paused) {
-        paused = false;
-      }
-    });
-  }
+    switch (e.key) {
+      case 'ArrowUp':
+        if (velocity.y === 0) velocity = {x: 0, y: -1};
+        break;
+      case 'ArrowDown':
+        if (velocity.y === 0) velocity = {x: 0, y: 1};
+        break;
+      case 'ArrowLeft':
+        if (velocity.x === 0) velocity = {x: -1, y: 0};
+        break;
+      case 'ArrowRight':
+        if (velocity.x === 0) velocity = {x: 1, y: 0};
+        break;
+    }
+  });
 
-  // Initialize the game
   initGame();
 </script>
 
