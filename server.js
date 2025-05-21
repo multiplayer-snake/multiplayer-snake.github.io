@@ -23,7 +23,6 @@ let started = false;
 let paused = false;
 let gameInterval;
 const gridSize = 35; // Must match client's tileCount
-let adminConnected = false; // Track if admin is connected
 
 // Player colors
 const colors = [
@@ -61,7 +60,7 @@ function spawnFood() {
 }
 
 // Initialize a new player
-function createPlayer(ws, name, isAdmin = false) {
+function createPlayer(ws, name) {
   const playerId = uuidv4();
   const colorIndex = Object.keys(players).length % colors.length;
 
@@ -69,20 +68,15 @@ function createPlayer(ws, name, isAdmin = false) {
     id: playerId,
     ws: ws,
     name: name,
-    color: isAdmin ? "#ffffff" : colors[colorIndex],
+    color: colors[colorIndex],
     snake: [{ 
       x: 5 + Math.floor(Math.random() * (gridSize - 10)), 
       y: 5 + Math.floor(Math.random() * (gridSize - 10)) 
     }],
     direction: { x: 0, y: 0 },
     score: 0,
-    alive: true,
-    isAdmin: isAdmin
+    alive: true
   };
-
-  if (isAdmin) {
-    adminConnected = true;
-  }
 
   return playerId;
 }
@@ -121,8 +115,7 @@ function getClientGameState() {
       color: player.color,
       snake: player.snake,
       score: player.score,
-      alive: player.alive,
-      isAdmin: player.isAdmin  // Include admin status in client state
+      alive: player.alive
     };
   }
 
@@ -242,16 +235,6 @@ function playerDied(playerId) {
   }, 3000);
 }
 
-// Find admin player id if any
-function getAdminPlayerId() {
-  for (const pid in players) {
-    if (players[pid].isAdmin) {
-      return pid;
-    }
-  }
-  return null;
-}
-
 // Handle WebSocket connection
 wss.on('connection', (ws) => {
   console.log('New client connected');
@@ -263,78 +246,45 @@ wss.on('connection', (ws) => {
       const message = JSON.parse(data);
 
       switch (message.type) {
-        case "admin_command":
-          if (playerId && players[playerId] && players[playerId].isAdmin) {
-            console.log("Admin command received:", message);
-            switch (message.command) {
-              case "kick_player":
-                if (message.targetId && players[message.targetId]) {
-                  console.log("Kicking player:", message.targetId);
-                  sendToClient(players[message.targetId].ws, {
-                    type: "kicked",
-                    reason: "Kicked by admin"
-                  });
-                  players[message.targetId].ws.close();
-                  delete players[message.targetId];
-                  broadcast(getClientGameState());
-                }
-                break;
-              case "set_speed":
-                const newSpeed = Math.max(50, Math.min(200, parseInt(message.speed)));
-                console.log("Setting game speed to:", newSpeed);
-                clearInterval(gameInterval);
-                gameSpeed = newSpeed;
-                gameInterval = setInterval(updateGame, gameSpeed);
-                broadcast({
-                  type: "speed_changed",
-                  speed: gameSpeed
-                });
-                break;
-              case "reset_game":
-                console.log("Resetting game");
-                started = false;
-                paused = false;
-                initializeFoods();
-                for (const pid in players) {
-                  const player = players[pid];
-                  player.score = 0;
-                  player.snake = [{ 
-                    x: 5 + Math.floor(Math.random() * (gridSize - 10)), 
-                    y: 5 + Math.floor(Math.random() * (gridSize - 10)) 
-                  }];
-                  player.direction = { x: 0, y: 0 };
-                  player.alive = true;
-                }
-                broadcast(getClientGameState());
-                break;
-            }
-          } else {
-            console.log("Non-admin tried to use admin command:", playerId);
+        case "set_speed":
+          const newSpeed = Math.max(50, Math.min(200, parseInt(message.speed)));
+          console.log("Setting game speed to:", newSpeed);
+          clearInterval(gameInterval);
+          gameSpeed = newSpeed;
+          gameInterval = setInterval(updateGame, gameSpeed);
+          broadcast({
+            type: "speed_changed",
+            speed: gameSpeed
+          });
+          break;
+          
+        case "reset_game":
+          console.log("Resetting game");
+          started = false;
+          paused = false;
+          initializeFoods();
+          for (const pid in players) {
+            const player = players[pid];
+            player.score = 0;
+            player.snake = [{ 
+              x: 5 + Math.floor(Math.random() * (gridSize - 10)), 
+              y: 5 + Math.floor(Math.random() * (gridSize - 10)) 
+            }];
+            player.direction = { x: 0, y: 0 };
+            player.alive = true;
           }
+          broadcast(getClientGameState());
           break;
 
         case "join":
-          // Check if "admin" name and password are used
-          const isAdmin = message.name === "admin" && message.password === "admin123";
-
-          // If admin is already connected, reject new admin attempts
-          if (isAdmin && adminConnected) {
-            sendToClient(ws, {
-              type: "error",
-              message: "Admin is already connected"
-            });
-            return;
-          }
-
           // Create new player
-          playerId = createPlayer(ws, message.name || "Player", isAdmin);
-          console.log(`Player ${playerId} (${message.name}) joined${isAdmin ? " as ADMIN" : ""}`);
+          playerId = createPlayer(ws, message.name || "Player");
+          console.log(`Player ${playerId} (${message.name}) joined`);
 
           // Send player their ID and current game state
           sendToClient(ws, {
             type: "you_joined",
             playerId: playerId,
-            isAdmin: players[playerId].isAdmin,
             players: getClientGameState().players,
             foods: foods,
             started: started,
@@ -349,8 +299,7 @@ wss.on('connection', (ws) => {
             name: players[playerId].name,
             color: players[playerId].color,
             snake: players[playerId].snake,
-            score: players[playerId].score,
-            isAdmin: players[playerId].isAdmin
+            score: players[playerId].score
           }, playerId);
 
           // Start game interval if it's not running
@@ -360,40 +309,26 @@ wss.on('connection', (ws) => {
           break;
 
         case "start":
-          // Only admin can start the game
-          if (playerId && players[playerId] && players[playerId].isAdmin) {
-            if (!started) {
-              started = true;
-              paused = false;
-              initializeFoods();
-              broadcast({
-                type: "game_started"
-              });
-              console.log("Game started by admin");
-            }
-          } else {
-            sendToClient(ws, {
-              type: "error",
-              message: "Only admin can start the game"
+          // Anyone can start the game
+          if (!started) {
+            started = true;
+            paused = false;
+            initializeFoods();
+            broadcast({
+              type: "game_started"
             });
+            console.log("Game started by player", playerId);
           }
           break;
 
         case "toggle_pause":
-          // Only admin can pause/resume the game
-          if (playerId && players[playerId] && players[playerId].isAdmin) {
-            paused = !paused;
-            broadcast({
-              type: "game_paused",
-              paused: paused
-            });
-            console.log(`Game ${paused ? "paused" : "resumed"} by admin`);
-          } else {
-            sendToClient(ws, {
-              type: "error",
-              message: "Only admin can pause/resume the game"
-            });
-          }
+          // Anyone can pause/resume the game
+          paused = !paused;
+          broadcast({
+            type: "game_paused",
+            paused: paused
+          });
+          console.log(`Game ${paused ? "paused" : "resumed"} by player`, playerId);
           break;
 
         case "direction":
@@ -428,8 +363,7 @@ wss.on('connection', (ws) => {
   // Handle client disconnection
   ws.on('close', () => {
     if (playerId && players[playerId]) {
-      const wasAdmin = players[playerId].isAdmin;
-      console.log(`Player ${playerId} disconnected${wasAdmin ? " (ADMIN)" : ""}`);
+      console.log(`Player ${playerId} disconnected`);
 
       // Notify other players
       broadcast({
@@ -439,11 +373,6 @@ wss.on('connection', (ws) => {
 
       // Remove player
       delete players[playerId];
-
-      // If admin left, update adminConnected flag
-      if (wasAdmin) {
-        adminConnected = false;
-      }
 
       // If no players left, clear game interval
       if (Object.keys(players).length === 0) {
