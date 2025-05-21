@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Snake Game</title>
+  <title>Multiplayer Snake Game</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -17,6 +17,16 @@
       height: 101vh;
       flex-direction: column;
     }
+    .game-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .side-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
     canvas {
       border: 2px solid #0f0;
       background-color: #000;
@@ -24,140 +34,535 @@
     h1 {
       margin-bottom: 10px;
     }
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .buttons {
+      margin-top: 10px;
+    }
+    button {
+      background-color: #0f0;
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      margin: 0 5px;
+      cursor: pointer;
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+    }
+    button:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+    input {
+      background-color: #222;
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 8px;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .players-list {
+      margin-top: 10px;
+      color: #0f0;
+      max-width: 560px;
+      text-align: center;
+    }
+    .player-colors {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      max-width: 560px;
+    }
+    .player-color {
+      display: flex;
+      align-items: center;
+      margin: 5px 10px;
+    }
+    .color-box {
+      width: 15px;
+      height: 15px;
+      margin-right: 5px;
+    }
+    .error-message {
+      color: #ff3333;
+      margin-top: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .admin-badge {
+      background-color: #ff0;
+      color: #000;
+      font-size: 10px;
+      padding: 2px 4px;
+      margin-left: 5px;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body>
-  <canvas id="game" width="560" height="560"></canvas>
+  <div class="game-container">
+    <div class="side-controls">
+      <input type="text" id="playerName" placeholder="Enter your name" maxlength="10">
+      <input type="password" id="adminPassword" placeholder="Admin password (optional)">
+      <button id="connectBtn">Connect</button>
+      <button id="startBtn" disabled>Start Game</button>
+      <button id="pauseBtn" disabled>Pause</button>
+      <div id="errorMessage" class="error-message"></div>
+      <div class="players-list">
+        <h3>Players Online: <span id="playerCount">0</span></h3>
+        <div class="player-colors" id="playerColors"></div>
+      </div>
+    </div>
+
+    <canvas id="game" width="560" height="560"></canvas>
+
+    <div class="side-controls">
+      <div class="controls-info">
+        <h3>Controls</h3>
+        <p>↑: Move Up</p>
+        <p>↓: Move Down</p>
+        <p>←: Move Left</p>
+        <p>→: Move Right</p>
+        <p>P: Pause Game (Admin Only)</p>
+      </div>
+      <div id="adminControls" style="display: none; margin-top: 20px;">
+        <h3>Admin Controls</h3>
+        <select id="playerSelect">
+          <option value="">Select Player to Kick</option>
+        </select>
+        <button id="kickPlayerBtn">Kick Player</button>
+        <div style="margin-top: 10px;">
+          <label>Game Speed (50-200ms):</label>
+          <input type="range" id="speedControl" min="50" max="200" value="100" />
+          <button id="updateSpeedBtn">Update Speed</button>
+        </div>
+        <button id="resetGameBtn" style="margin-top: 10px;">Reset Game</button>
+      </div>
+    </div>
+  </div>
+
 <script>
+  // Game canvas setup
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-
   const gridSize = 16;
   const tileCount = canvas.width / gridSize;
 
-  let snake, velocity, food, score, lives, level;
+  // UI elements
+  const playerNameInput = document.getElementById('playerName');
+  const connectBtn = document.getElementById('connectBtn');
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const playerCountElem = document.getElementById('playerCount');
+  const playerColorsElem = document.getElementById('playerColors');
+  const errorMessageElem = document.getElementById('errorMessage');
+  const kickPlayerBtn = document.getElementById('kickPlayerBtn');
+  const updateSpeedBtn = document.getElementById('updateSpeedBtn');
+  const resetGameBtn = document.getElementById('resetGameBtn');
+
+  // Game variables
+  let mySnake = null;
+  let myPlayerId = null;
+  let players = {};
+  let foods = [];
+  let speed = 60; // Faster client-side updates
+  let gameInterval;
+  let connected = false;
   let started = false;
   let paused = false;
-  let speed = 1000;
-  let interval;
+  let isAdmin = false;
 
-  function initGame() {
-    snake = [{x: 20, y: 20}];
-    velocity = {x: 0, y: 0};
-    food = spawnFood();
-    score = 0;
-    lives = 6;
-    level = 1;
-    speed = 90;
-    started = false;
-    paused = false;
-    clearInterval(interval);
-    interval = setInterval(gameLoop, speed);
-  }
+  // WebSocket connection
+  let socket;
+  const serverUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:${window.location.port}`;
 
-  function spawnFood() {
-    return {
-      x: Math.floor(Math.random() * tileCount),
-      y: Math.floor(Math.random() * tileCount)
-    };
-  }
+  // Player colors - add more as needed
+  const colors = [
+    "#0f0",    // Green
+    "#00f",    // Blue
+    "#f00",    // Red
+    "#ff0",    // Yellow
+    "#0ff",    // Cyan
+    "#f0f",    // Magenta
+    "#ff8800", // Orange
+    "#8800ff", // Purple
+    "#00ff88", // Mint
+    "#ff0088"  // Pink
+  ];
 
-  function gameLoop() {
-    if (!started || paused) {
-      draw(); // Still draw current frame
+  // Connect to WebSocket server
+  connectBtn.addEventListener('click', () => {
+    const playerName = playerNameInput.value.trim();
+    if (!playerName) {
+      showError('Please enter your name');
       return;
     }
 
-    const head = {x: snake[0].x + velocity.x, y: snake[0].y + velocity.y};
-
-    if (
-      head.x < 0 || head.y < 0 ||
-      head.x >= tileCount || head.y >= tileCount ||
-      snake.some(part => part.x === head.x && part.y === head.y)
-    ) {
-      lives--;
-      if (lives <= 0) {
-        alert(`Game Over! Final Score: ${score}, Level: ${level}`);
-        return initGame();
-      } else {
-        alert(`Oops! Lives remaining: ${lives}`);
-        snake = [{x: 10, y: 10}];
-        velocity = {x: 0, y: 0};
-        started = false;
-        return;
-      }
-    }
-
-    snake.unshift(head);
-
-    if (head.x === food.x && head.y === food.y) {
-      score++;
-      food = spawnFood();
-
-      // Level up every 5 points
-      if (score % 5 === 0) {
-        level++;
-        speed = Math.max(50, speed - 20);
-        clearInterval(interval);
-        interval = setInterval(gameLoop, speed);
-      }
-
-    } else {
-      snake.pop();
-    }
-
-    draw();
-  }
-
-  function draw() {
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw food
-    ctx.fillStyle = '#f00';
-    ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
-
-    // Draw snake
-    ctx.fillStyle = '#0f0';
-    for (let part of snake) {
-      ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize, gridSize);
-    }
-
-    // UI
-    ctx.fillStyle = '#00E8FF';
-    ctx.font = "16px Courier New";
-    ctx.fillText(`Score: ${score}`, 10, canvas.height - 10);
-    ctx.fillText(`Lives: ${lives}`, 100, canvas.height - 10);
-    ctx.fillText(`Level: ${level}`, 180, canvas.height - 10);
-    if (paused) ctx.fillText(`PAUSED`, 300, canvas.height - 10);
-  }
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'p' || e.key === 'p') {
-      paused = !paused;
+    if (connected) {
+      socket.close();
+      connectBtn.textContent = "Connect";
+      startBtn.disabled = true;
+      pauseBtn.disabled = true;
+      connected = false;
+      clearInterval(gameInterval);
       return;
     }
 
-    if (!started) started = true;
+    // Initialize WebSocket connection
+    try {
+      socket = new WebSocket(serverUrl);
 
-    switch (e.key) {
-      case 'ArrowUp':
-        if (velocity.y === 0) velocity = {x: 0, y: -1};
-        break;
-      case 'ArrowDown':
-        if (velocity.y === 0) velocity = {x: 0, y: 1};
-        break;
-      case 'ArrowLeft':
-        if (velocity.x === 0) velocity = {x: -1, y: 0};
-        break;
-      case 'ArrowRight':
-        if (velocity.x === 0) velocity = {x: 1, y: 0};
-        break;
+      socket.onopen = () => {
+        console.log("Connected to the server");
+        connected = true;
+        connectBtn.textContent = "Disconnect";
+        clearError();
+
+        // Send player join event
+        const adminPassword = document.getElementById('adminPassword').value;
+        socket.send(JSON.stringify({
+          type: "join",
+          name: playerName,
+          password: adminPassword
+        }));
+      };
+
+      socket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        handleServerMessage(message);
+      };
+
+      socket.onclose = () => {
+        console.log("Disconnected from the server");
+        connected = false;
+        isAdmin = false;
+        connectBtn.textContent = "Connect";
+        startBtn.disabled = true;
+        pauseBtn.disabled = true;
+        clearInterval(gameInterval);
+        players = {};
+        foods = [];
+        updatePlayersList();
+        document.getElementById('adminControls').style.display = 'none';
+      };
+
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        showError("Failed to connect to the server. Please try again later.");
+        connected = false;
+        connectBtn.textContent = "Connect";
+      };
+    } catch (error) {
+      console.error("Error initializing WebSocket:", error);
+      showError("Failed to connect to the server. Please try again later.");
     }
   });
 
-  initGame();
-</script>
+  // Show error message
+  function showError(message) {
+    errorMessageElem.textContent = message;
+    errorMessageElem.style.display = 'block';
+  }
 
+  // Clear error message
+  function clearError() {
+    errorMessageElem.textContent = '';
+    errorMessageElem.style.display = 'none';
+  }
+
+  // Start game
+  startBtn.addEventListener('click', () => {
+    if (!connected) return;
+
+    socket.send(JSON.stringify({
+      type: "start"
+    }));
+  });
+
+  // Pause game
+  pauseBtn.addEventListener('click', () => {
+    if (!connected) return;
+
+    socket.send(JSON.stringify({
+      type: "toggle_pause"
+    }));
+  });
+
+  // Admin control event listeners
+  kickPlayerBtn.addEventListener('click', () => {
+    if (!isAdmin) return;
+
+    const select = document.getElementById('playerSelect');
+    if (select.value) {
+      socket.send(JSON.stringify({
+        type: "admin_command",
+        command: "kick_player",
+        targetId: select.value
+      }));
+    }
+  });
+
+  updateSpeedBtn.addEventListener('click', () => {
+    if (!isAdmin) return;
+
+    const speedControl = document.getElementById('speedControl');
+    if (speedControl) {
+      const newSpeed = parseInt(speedControl.value);
+      console.log("Sending speed update:", newSpeed);
+      socket.send(JSON.stringify({
+        type: "admin_command",
+        command: "set_speed",
+        speed: newSpeed
+      }));
+    }
+  });
+
+  resetGameBtn.addEventListener('click', () => {
+    if (!isAdmin) return;
+
+    socket.send(JSON.stringify({
+      type: "admin_command",
+      command: "reset_game"
+    }));
+  });
+
+  // Handle arrow key controls
+  document.addEventListener('keydown', (e) => {
+    if (!connected || !myPlayerId) return;
+
+    let direction = null;
+
+    switch (e.key) {
+      case 'ArrowUp':
+        direction = "up";
+        break;
+      case 'ArrowDown':
+        direction = "down";
+        break;
+      case 'ArrowLeft':
+        direction = "left";
+        break;
+      case 'ArrowRight':
+        direction = "right";
+        break;
+      case 'p':
+        if (isAdmin) {
+          socket.send(JSON.stringify({
+            type: "toggle_pause"
+          }));
+        }
+        return;
+    }
+
+    if (direction) {
+      socket.send(JSON.stringify({
+        type: "direction",
+        direction: direction
+      }));
+    }
+  });
+
+  // Handle server messages
+  function handleServerMessage(message) {
+    switch (message.type) {
+      case "game_state":
+        updateGameState(message);
+        break;
+      case "player_joined":
+        players[message.playerId] = {
+          id: message.playerId,
+          name: message.name,
+          color: message.color,
+          snake: message.snake,
+          score: message.score,
+          alive: true,
+          isAdmin: message.isAdmin
+        };
+        updatePlayersList();
+        break;
+      case "player_left":
+        delete players[message.playerId];
+        updatePlayersList();
+        break;
+      case "you_joined":
+        myPlayerId = message.playerId;
+        isAdmin = message.isAdmin;
+        players = message.players;
+        foods = message.foods;
+        started = message.started;
+        paused = message.paused;
+
+        // Update UI based on admin status
+        if (isAdmin) {
+          document.getElementById('adminControls').style.display = 'block';
+          startBtn.disabled = false;
+          pauseBtn.disabled = false;
+        } else {
+          startBtn.disabled = true;
+          pauseBtn.disabled = true;
+        }
+
+        updatePlayersList();
+        startGameLoop();
+        break;
+      case "game_started":
+        started = true;
+        paused = false;
+        break;
+      case "game_paused":
+        paused = message.paused;
+        break;
+      case "player_died":
+        if (players[message.playerId]) {
+          players[message.playerId].alive = false;
+        }
+        break;
+      case "kicked":
+        alert("You have been kicked by an admin");
+        socket.close();
+        break;
+      case "speed_changed":
+        speed = message.speed;
+        if (gameInterval) {
+          clearInterval(gameInterval);
+          gameInterval = setInterval(gameLoop, speed);
+        }
+        break;
+      case "error":
+        showError(message.message);
+        break;
+    }
+  }
+
+  // Update game state with data from server
+  function updateGameState(state) {
+    players = state.players;
+    foods = state.foods;
+    started = state.started;
+    paused = state.paused;
+  }
+
+  // Start the game loop
+  function startGameLoop() {
+    if (gameInterval) clearInterval(gameInterval);
+    gameInterval = setInterval(gameLoop, speed);
+  }
+
+  // Main game loop
+  function gameLoop() {
+    drawGame();
+  }
+
+  // Draw the game state
+  function drawGame() {
+    // Clear the canvas
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw foods
+    for (const food of foods) {
+      ctx.fillStyle = food.color || '#f00';
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
+    }
+
+    // Draw snakes
+    for (const playerId in players) {
+      const player = players[playerId];
+      if (!player.snake || !player.alive) continue;
+
+      // Draw each segment of the snake
+      ctx.fillStyle = player.color;
+      for (const segment of player.snake) {
+        // Smooth rendering with anti-aliasing
+        ctx.fillRect(Math.round(segment.x * gridSize), Math.round(segment.y * gridSize), gridSize, gridSize);
+      }
+
+      // Draw player name above their snake if it's alive
+      if (player.snake.length > 0) {
+        const head = player.snake[0];
+        ctx.fillStyle = player.color;
+        ctx.font = "12px Courier New";
+        ctx.fillText(player.name, head.x * gridSize - 10, head.y * gridSize - 5);
+      }
+    }
+
+    // Draw game info
+    ctx.fillStyle = '#00E8FF';
+    ctx.font = "16px Courier New";
+
+    // Game state
+    let statusText = started ? (paused ? "PAUSED" : "PLAYING") : "WAITING";
+    ctx.fillText(`Status: ${statusText}`, 10, canvas.height - 10);
+
+    // Player score
+    if (myPlayerId && players[myPlayerId]) {
+      ctx.fillText(`Score: ${players[myPlayerId].score || 0}`, 150, canvas.height - 10);
+    }
+
+    // Player count
+    ctx.fillText(`Players: ${Object.keys(players).length}`, 250, canvas.height - 10);
+
+    // Controls hint
+    ctx.fillText("Arrows: Move  P: Pause (Admin)", 350, canvas.height - 10);
+  }
+
+  // Update players list display
+  function updatePlayersList() {
+    playerCountElem.textContent = Object.keys(players).length;
+
+    // Update admin controls if player is admin
+    const adminControls = document.getElementById('adminControls');
+    const speedControl = document.getElementById('speedControl');
+    if (myPlayerId && players[myPlayerId] && players[myPlayerId].isAdmin) {
+      adminControls.style.display = 'block';
+      speedControl.value = speed;
+
+      // Update player select dropdown
+      const select = document.getElementById('playerSelect');
+      select.innerHTML = '<option value="">Select Player to Kick</option>';
+      for (const pid in players) {
+        if (pid !== myPlayerId) {
+          const opt = document.createElement('option');
+          opt.value = pid;
+          opt.textContent = players[pid].name;
+          select.appendChild(opt);
+        }
+      }
+    } else {
+      adminControls.style.display = 'none';
+    }
+
+    // Update player colors display
+    playerColorsElem.innerHTML = '';
+    for (const playerId in players) {
+      const player = players[playerId];
+      const playerDiv = document.createElement('div');
+      playerDiv.className = 'player-color';
+
+      const colorBox = document.createElement('div');
+      colorBox.className = 'color-box';
+      colorBox.style.backgroundColor = player.color;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = `${player.name}: ${player.score || 0}`;
+
+      // Add admin badge if player is admin
+      if (player.isAdmin) {
+        const adminBadge = document.createElement('span');
+        adminBadge.className = 'admin-badge';
+        adminBadge.textContent = 'ADMIN';
+        nameSpan.appendChild(adminBadge);
+      }
+
+      playerDiv.appendChild(colorBox);
+      playerDiv.appendChild(nameSpan);
+      playerColorsElem.appendChild(playerDiv);
+    }
+  }
+</script>
 </body>
 </html>
