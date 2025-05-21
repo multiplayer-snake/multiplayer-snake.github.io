@@ -93,13 +93,10 @@
       text-align: center;
       font-weight: bold;
     }
-    .admin-badge {
-      background-color: #ff0;
-      color: #000;
-      font-size: 10px;
-      padding: 2px 4px;
-      margin-left: 5px;
-      border-radius: 3px;
+    .game-controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
     }
   </style>
 </head>
@@ -107,10 +104,11 @@
   <div class="game-container">
     <div class="side-controls">
       <input type="text" id="playerName" placeholder="Enter your name" maxlength="10">
-      <input type="password" id="adminPassword" placeholder="Admin password (optional)">
       <button id="connectBtn">Connect</button>
-      <button id="startBtn" disabled>Start Game</button>
-      <button id="pauseBtn" disabled>Pause</button>
+      <div class="game-controls">
+        <button id="startBtn" disabled>Start Game</button>
+        <button id="pauseBtn" disabled>Pause</button>
+      </div>
       <div id="errorMessage" class="error-message"></div>
       <div class="players-list">
         <h3>Players Online: <span id="playerCount">0</span></h3>
@@ -127,15 +125,11 @@
         <p>↓: Move Down</p>
         <p>←: Move Left</p>
         <p>→: Move Right</p>
-        <p>P: Pause Game (Admin Only)</p>
+        <p>P: Pause Game</p>
       </div>
-      <div id="adminControls" style="display: none; margin-top: 20px;">
-        <h3>Admin Controls</h3>
-        <select id="playerSelect">
-          <option value="">Select Player to Kick</option>
-        </select>
-        <button id="kickPlayerBtn">Kick Player</button>
-        <div style="margin-top: 10px;">
+      <div class="speed-control" style="margin-top: 20px;">
+        <h3>Game Settings</h3>
+        <div>
           <label>Game Speed (50-200ms):</label>
           <input type="range" id="speedControl" min="50" max="200" value="100" />
           <button id="updateSpeedBtn">Update Speed</button>
@@ -160,7 +154,6 @@
   const playerCountElem = document.getElementById('playerCount');
   const playerColorsElem = document.getElementById('playerColors');
   const errorMessageElem = document.getElementById('errorMessage');
-  const kickPlayerBtn = document.getElementById('kickPlayerBtn');
   const updateSpeedBtn = document.getElementById('updateSpeedBtn');
   const resetGameBtn = document.getElementById('resetGameBtn');
 
@@ -174,7 +167,6 @@
   let connected = false;
   let started = false;
   let paused = false;
-  let isAdmin = false;
 
   // WebSocket connection
   let socket;
@@ -223,11 +215,9 @@
         clearError();
 
         // Send player join event
-        const adminPassword = document.getElementById('adminPassword').value;
         socket.send(JSON.stringify({
           type: "join",
-          name: playerName,
-          password: adminPassword
+          name: playerName
         }));
       };
 
@@ -239,7 +229,6 @@
       socket.onclose = () => {
         console.log("Disconnected from the server");
         connected = false;
-        isAdmin = false;
         connectBtn.textContent = "Connect";
         startBtn.disabled = true;
         pauseBtn.disabled = true;
@@ -247,7 +236,6 @@
         players = {};
         foods = [];
         updatePlayersList();
-        document.getElementById('adminControls').style.display = 'none';
       };
 
       socket.onerror = (error) => {
@@ -292,41 +280,26 @@
     }));
   });
 
-  // Admin control event listeners
-  kickPlayerBtn.addEventListener('click', () => {
-    if (!isAdmin) return;
-
-    const select = document.getElementById('playerSelect');
-    if (select.value) {
-      socket.send(JSON.stringify({
-        type: "admin_command",
-        command: "kick_player",
-        targetId: select.value
-      }));
-    }
-  });
-
+  // Speed update event listeners
   updateSpeedBtn.addEventListener('click', () => {
-    if (!isAdmin) return;
+    if (!connected) return;
 
     const speedControl = document.getElementById('speedControl');
     if (speedControl) {
       const newSpeed = parseInt(speedControl.value);
       console.log("Sending speed update:", newSpeed);
       socket.send(JSON.stringify({
-        type: "admin_command",
-        command: "set_speed",
+        type: "set_speed",
         speed: newSpeed
       }));
     }
   });
 
   resetGameBtn.addEventListener('click', () => {
-    if (!isAdmin) return;
+    if (!connected) return;
 
     socket.send(JSON.stringify({
-      type: "admin_command",
-      command: "reset_game"
+      type: "reset_game"
     }));
   });
 
@@ -350,11 +323,9 @@
         direction = "right";
         break;
       case 'p':
-        if (isAdmin) {
-          socket.send(JSON.stringify({
-            type: "toggle_pause"
-          }));
-        }
+        socket.send(JSON.stringify({
+          type: "toggle_pause"
+        }));
         return;
     }
 
@@ -379,8 +350,7 @@
           color: message.color,
           snake: message.snake,
           score: message.score,
-          alive: true,
-          isAdmin: message.isAdmin
+          alive: true
         };
         updatePlayersList();
         break;
@@ -390,21 +360,14 @@
         break;
       case "you_joined":
         myPlayerId = message.playerId;
-        isAdmin = message.isAdmin;
         players = message.players;
         foods = message.foods;
         started = message.started;
         paused = message.paused;
 
-        // Update UI based on admin status
-        if (isAdmin) {
-          document.getElementById('adminControls').style.display = 'block';
-          startBtn.disabled = false;
-          pauseBtn.disabled = false;
-        } else {
-          startBtn.disabled = true;
-          pauseBtn.disabled = true;
-        }
+        // Enable game control buttons for all players
+        startBtn.disabled = false;
+        pauseBtn.disabled = false;
 
         updatePlayersList();
         startGameLoop();
@@ -420,10 +383,6 @@
         if (players[message.playerId]) {
           players[message.playerId].alive = false;
         }
-        break;
-      case "kicked":
-        alert("You have been kicked by an admin");
-        socket.close();
         break;
       case "speed_changed":
         speed = message.speed;
@@ -507,34 +466,16 @@
     ctx.fillText(`Players: ${Object.keys(players).length}`, 250, canvas.height - 10);
 
     // Controls hint
-    ctx.fillText("Arrows: Move  P: Pause (Admin)", 350, canvas.height - 10);
+    ctx.fillText("Arrows: Move  P: Pause", 350, canvas.height - 10);
   }
 
   // Update players list display
   function updatePlayersList() {
     playerCountElem.textContent = Object.keys(players).length;
 
-    // Update admin controls if player is admin
-    const adminControls = document.getElementById('adminControls');
+    // Update speed control
     const speedControl = document.getElementById('speedControl');
-    if (myPlayerId && players[myPlayerId] && players[myPlayerId].isAdmin) {
-      adminControls.style.display = 'block';
-      speedControl.value = speed;
-
-      // Update player select dropdown
-      const select = document.getElementById('playerSelect');
-      select.innerHTML = '<option value="">Select Player to Kick</option>';
-      for (const pid in players) {
-        if (pid !== myPlayerId) {
-          const opt = document.createElement('option');
-          opt.value = pid;
-          opt.textContent = players[pid].name;
-          select.appendChild(opt);
-        }
-      }
-    } else {
-      adminControls.style.display = 'none';
-    }
+    speedControl.value = speed;
 
     // Update player colors display
     playerColorsElem.innerHTML = '';
@@ -549,14 +490,6 @@
 
       const nameSpan = document.createElement('span');
       nameSpan.textContent = `${player.name}: ${player.score || 0}`;
-
-      // Add admin badge if player is admin
-      if (player.isAdmin) {
-        const adminBadge = document.createElement('span');
-        adminBadge.className = 'admin-badge';
-        adminBadge.textContent = 'ADMIN';
-        nameSpan.appendChild(adminBadge);
-      }
 
       playerDiv.appendChild(colorBox);
       playerDiv.appendChild(nameSpan);
