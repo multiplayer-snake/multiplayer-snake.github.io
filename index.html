@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Multiplayer Snake Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snake Game for CrazyGames</title>
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-03EVYSP4HP"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-03EVYSP4HP');
+  </script>
+  
   <style>
     * { box-sizing: border-box; }
     body {
@@ -14,488 +24,292 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 101vh;
+      height: 100vh;
       flex-direction: column;
-    }
-    .game-container {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    .side-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      position: relative;
     }
     canvas {
-      border: 2px solid #0f0;
+      /* The border color and snake color are now CrazyGames purple */
+      border: 2px solid #9b59b6;
       background-color: #000;
+      /* When not fullscreen, we use fixed dimensions. */
+      width: 560px;
+      height: 560px;
     }
-    h1 {
-      margin-bottom: 10px;
-    }
-    .controls {
-      margin-top: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .buttons {
-      margin-top: 10px;
-    }
-    button {
-      background-color: #0f0;
-      color: #000;
-      border: none;
-      padding: 8px 16px;
-      margin: 0 5px;
-      cursor: pointer;
-      font-family: 'Courier New', Courier, monospace;
-      font-weight: bold;
-    }
-    button:disabled {
-      background-color: #555;
-      cursor: not-allowed;
-    }
-    input {
-      background-color: #222;
-      color: #0f0;
-      border: 1px solid #0f0;
-      padding: 8px;
-      font-family: 'Courier New', Courier, monospace;
-    }
-    .players-list {
-      margin-top: 10px;
-      color: #0f0;
-      max-width: 560px;
+    /* Overlay for messages */
+    .overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 24px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border: 2px solid #9b59b6;
+      display: none;
+      z-index: 10;
       text-align: center;
-    }
-    .player-colors {
-      display: flex;
-      justify-content: center;
-      margin-top: 10px;
-      flex-wrap: wrap;
-      max-width: 560px;
-    }
-    .player-color {
-      display: flex;
-      align-items: center;
-      margin: 5px 10px;
-    }
-    .color-box {
-      width: 15px;
-      height: 15px;
-      margin-right: 5px;
-    }
-    .error-message {
-      color: #ff3333;
-      margin-top: 10px;
-      text-align: center;
-      font-weight: bold;
-    }
-    .game-controls {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <div class="game-container">
-    <div class="side-controls">
-      <input type="text" id="playerName" placeholder="Enter your name" maxlength="10">
-      <button id="connectBtn">Connect</button>
-      <div class="game-controls">
-        <button id="startBtn" disabled>Start Game</button>
-        <button id="pauseBtn" disabled>Pause</button>
-      </div>
-      <div id="errorMessage" class="error-message"></div>
-      <div class="players-list">
-        <h3>Players Online: <span id="playerCount">0</span></h3>
-        <div class="player-colors" id="playerColors"></div>
-      </div>
-    </div>
-
-    <canvas id="game" width="560" height="560"></canvas>
-
-    <div class="side-controls">
-      <div class="controls-info">
-        <h3>Controls</h3>
-        <p>↑: Move Up</p>
-        <p>↓: Move Down</p>
-        <p>←: Move Left</p>
-        <p>→: Move Right</p>
-        <p>P: Pause Game</p>
-      </div>
-      <div class="speed-control" style="margin-top: 20px;">
-        <h3>Game Settings</h3>
-        <div>
-          <label>Game Speed (50-200ms):</label>
-          <input type="range" id="speedControl" min="50" max="200" value="100" />
-          <button id="updateSpeedBtn">Update Speed</button>
-        </div>
-        <button id="resetGameBtn" style="margin-top: 10px;">Reset Game</button>
-      </div>
-    </div>
-  </div>
-
-<script>
-  // Game canvas setup
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const gridSize = 16;
-  const tileCount = canvas.width / gridSize;
-
-  // UI elements
-  const playerNameInput = document.getElementById('playerName');
-  const connectBtn = document.getElementById('connectBtn');
-  const startBtn = document.getElementById('startBtn');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const playerCountElem = document.getElementById('playerCount');
-  const playerColorsElem = document.getElementById('playerColors');
-  const errorMessageElem = document.getElementById('errorMessage');
-  const updateSpeedBtn = document.getElementById('updateSpeedBtn');
-  const resetGameBtn = document.getElementById('resetGameBtn');
-
-  // Game variables
-  let mySnake = null;
-  let myPlayerId = null;
-  let players = {};
-  let foods = [];
-  let speed = 60; // Faster client-side updates
-  let gameInterval;
-  let connected = false;
-  let started = false;
-  let paused = false;
-
-  // WebSocket connection
-  let socket;
-  const serverUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:${window.location.port}`;
-
-  // Player colors - add more as needed
-  const colors = [
-    "#0f0",    // Green
-    "#00f",    // Blue
-    "#f00",    // Red
-    "#ff0",    // Yellow
-    "#0ff",    // Cyan
-    "#f0f",    // Magenta
-    "#ff8800", // Orange
-    "#8800ff", // Purple
-    "#00ff88", // Mint
-    "#ff0088"  // Pink
-  ];
-
-  // Connect to WebSocket server
-  connectBtn.addEventListener('click', () => {
-    const playerName = playerNameInput.value.trim();
-    if (!playerName) {
-      showError('Please enter your name');
-      return;
+  <!-- Overlay div for life lost/game over messages -->
+  <div id="overlay" class="overlay"></div>
+  <canvas id="game"></canvas>
+ 
+  <script>
+    // CrazyGames API integration (if available)
+    if (window.CrazyGamesAPI) {
+      CrazyGamesAPI.init();
     }
-
-    if (connected) {
-      socket.close();
-      connectBtn.textContent = "Connect";
-      startBtn.disabled = true;
-      pauseBtn.disabled = true;
-      connected = false;
-      clearInterval(gameInterval);
-      return;
+   
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const overlayDiv = document.getElementById('overlay');
+    const gridSize = 16; // size of one grid cell (in pixels)
+    let tileCountX, tileCountY; // horizontal and vertical number of cells
+    let snake, velocity, food, score, lives, level, highScore, nextLevelScore;
+    let started = false;
+    let paused = false;
+    let speed = 90;
+    let interval;
+    let overlayMessage = null;
+   
+    // Update the canvas size and recalc grid dimensions.
+    // If in fullscreen mode, fill the window; otherwise, use default dimensions.
+    function updateCanvasSize() {
+      if (document.fullscreenElement) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      } else {
+        canvas.width = 560;
+        canvas.height = 560;
+      }
+      tileCountX = Math.floor(canvas.width / gridSize);
+      tileCountY = Math.floor(canvas.height / gridSize);
     }
-
-    // Initialize WebSocket connection
-    try {
-      socket = new WebSocket(serverUrl);
-
-      socket.onopen = () => {
-        console.log("Connected to the server");
-        connected = true;
-        connectBtn.textContent = "Disconnect";
-        clearError();
-
-        // Send player join event
-        socket.send(JSON.stringify({
-          type: "join",
-          name: playerName
-        }));
-      };
-
-      socket.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        handleServerMessage(message);
-      };
-
-      socket.onclose = () => {
-        console.log("Disconnected from the server");
-        connected = false;
-        connectBtn.textContent = "Connect";
-        startBtn.disabled = true;
-        pauseBtn.disabled = true;
-        clearInterval(gameInterval);
-        players = {};
-        foods = [];
-        updatePlayersList();
-      };
-
-      socket.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        showError("Failed to connect to the server. Please try again later.");
-        connected = false;
-        connectBtn.textContent = "Connect";
-      };
-    } catch (error) {
-      console.error("Error initializing WebSocket:", error);
-      showError("Failed to connect to the server. Please try again later.");
+   
+    // Initialize the game state; recalc canvas size.
+    function initGame() {
+      updateCanvasSize();
+      snake = [{ x: 20, y: 20 }];
+      velocity = { x: 0, y: 0 };
+      food = spawnFood();
+      score = 0;
+      lives = 6;
+      level = 1;
+      nextLevelScore = 5;  // First level up threshold.
+      highScore = localStorage.getItem('highScore') || 0;
+      speed = 90;
+      started = false;
+      paused = false;
+      overlayMessage = null;
+      hideOverlay();
+      clearInterval(interval);
+      interval = setInterval(gameLoop, speed);
+      
+      // Track game start
+      if (typeof gtag !== 'undefined') {
+        gtag('event', 'game_start', {
+          'event_category': 'Snake Game'
+        });
+      }
     }
-  });
-
-  // Show error message
-  function showError(message) {
-    errorMessageElem.textContent = message;
-    errorMessageElem.style.display = 'block';
-  }
-
-  // Clear error message
-  function clearError() {
-    errorMessageElem.textContent = '';
-    errorMessageElem.style.display = 'none';
-  }
-
-  // Start game
-  startBtn.addEventListener('click', () => {
-    if (!connected) return;
-
-    socket.send(JSON.stringify({
-      type: "start"
-    }));
-  });
-
-  // Pause game
-  pauseBtn.addEventListener('click', () => {
-    if (!connected) return;
-
-    socket.send(JSON.stringify({
-      type: "toggle_pause"
-    }));
-  });
-
-  // Speed update event listeners
-  updateSpeedBtn.addEventListener('click', () => {
-    if (!connected) return;
-
-    const speedControl = document.getElementById('speedControl');
-    if (speedControl) {
-      const newSpeed = parseInt(speedControl.value);
-      console.log("Sending speed update:", newSpeed);
-      socket.send(JSON.stringify({
-        type: "set_speed",
-        speed: newSpeed
-      }));
+   
+    // Spawns food at a random cell within the current board dimensions.
+    function spawnFood() {
+      return {
+        x: Math.floor(Math.random() * tileCountX),
+        y: Math.floor(Math.random() * tileCountY)
+      };
     }
-  });
-
-  resetGameBtn.addEventListener('click', () => {
-    if (!connected) return;
-
-    socket.send(JSON.stringify({
-      type: "reset_game"
-    }));
-  });
-
-  // Handle arrow key controls
-  document.addEventListener('keydown', (e) => {
-    if (!connected || !myPlayerId) return;
-
-    let direction = null;
-
-    switch (e.key) {
-      case 'ArrowUp':
-        direction = "up";
-        break;
-      case 'ArrowDown':
-        direction = "down";
-        break;
-      case 'ArrowLeft':
-        direction = "left";
-        break;
-      case 'ArrowRight':
-        direction = "right";
-        break;
-      case 'p':
-        socket.send(JSON.stringify({
-          type: "toggle_pause"
-        }));
+   
+    function gameLoop() {
+      if (!started || paused) {
+        draw();
         return;
-    }
-
-    if (direction) {
-      socket.send(JSON.stringify({
-        type: "direction",
-        direction: direction
-      }));
-    }
-  });
-
-  // Handle server messages
-  function handleServerMessage(message) {
-    switch (message.type) {
-      case "game_state":
-        updateGameState(message);
-        break;
-      case "player_joined":
-        players[message.playerId] = {
-          id: message.playerId,
-          name: message.name,
-          color: message.color,
-          snake: message.snake,
-          score: message.score,
-          alive: true
-        };
-        updatePlayersList();
-        break;
-      case "player_left":
-        delete players[message.playerId];
-        updatePlayersList();
-        break;
-      case "you_joined":
-        myPlayerId = message.playerId;
-        players = message.players;
-        foods = message.foods;
-        started = message.started;
-        paused = message.paused;
-
-        // Enable game control buttons for all players
-        startBtn.disabled = false;
-        pauseBtn.disabled = false;
-
-        updatePlayersList();
-        startGameLoop();
-        break;
-      case "game_started":
-        started = true;
-        paused = false;
-        break;
-      case "game_paused":
-        paused = message.paused;
-        break;
-      case "player_died":
-        if (players[message.playerId]) {
-          players[message.playerId].alive = false;
+      }
+     
+      const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
+     
+      // Collision: with walls or self.
+      if (
+        head.x < 0 ||
+        head.y < 0 ||
+        head.x >= tileCountX ||
+        head.y >= tileCountY ||
+        snake.some(part => part.x === head.x && part.y === head.y)
+      ) {
+        handleCollision();
+        return;
+      }
+     
+      snake.unshift(head);
+     
+      // Snake eats food.
+      if (head.x === food.x && head.y === food.y) {
+        score++;
+        updateHighScore();
+        if (window.CrazyGamesAPI) {
+          CrazyGamesAPI.game.setScore(score);
         }
-        break;
-      case "speed_changed":
-        speed = message.speed;
-        if (gameInterval) {
-          clearInterval(gameInterval);
-          gameInterval = setInterval(gameLoop, speed);
+        food = spawnFood();
+        if (score >= nextLevelScore) {
+          level++;
+          nextLevelScore += 5;
+          speed = Math.max(50, speed - 10);
+          clearInterval(interval);
+          interval = setInterval(gameLoop, speed);
+          
+          // Track level up
+          if (typeof gtag !== 'undefined') {
+            gtag('event', 'level_up', {
+              'event_category': 'Snake Game',
+              'value': level
+            });
+          }
         }
-        break;
-      case "error":
-        showError(message.message);
-        break;
+      } else {
+        snake.pop();
+      }
+      draw();
     }
-  }
-
-  // Update game state with data from server
-  function updateGameState(state) {
-    players = state.players;
-    foods = state.foods;
-    started = state.started;
-    paused = state.paused;
-  }
-
-  // Start the game loop
-  function startGameLoop() {
-    if (gameInterval) clearInterval(gameInterval);
-    gameInterval = setInterval(gameLoop, speed);
-  }
-
-  // Main game loop
-  function gameLoop() {
-    drawGame();
-  }
-
-  // Draw the game state
-  function drawGame() {
-    // Clear the canvas
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw foods
-    for (const food of foods) {
-      ctx.fillStyle = food.color || '#f00';
+   
+    function handleCollision() {
+      lives--;
+      if (lives > 0) {
+        paused = true;
+        overlayMessage = `Oops! Lives remaining: ${lives}`;
+        showOverlay(overlayMessage);
+        setTimeout(() => {
+          hideOverlay();
+          paused = false;
+          snake = [{ x: 10, y: 10 }];
+          velocity = { x: 0, y: 0 };
+          // Wait for a new key press before resuming movement.
+          started = false;
+        }, 1000);
+      } else {
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem('highScore', highScore);
+        }
+        paused = true;
+        overlayMessage = `Game Over! Final Score: ${score}, Level: ${level}`;
+        showOverlay(overlayMessage);
+        
+        // Track game over
+        if (typeof gtag !== 'undefined') {
+          gtag('event', 'game_over', {
+            'event_category': 'Snake Game',
+            'value': score,
+            'custom_parameters': {
+              'level': level,
+              'high_score': highScore
+            }
+          });
+        }
+        
+        setTimeout(() => {
+          hideOverlay();
+          initGame();
+        }, 2000);
+      }
+    }
+   
+    function showOverlay(message) {
+      overlayDiv.textContent = message;
+      overlayDiv.style.display = 'block';
+    }
+   
+    function hideOverlay() {
+      overlayDiv.style.display = 'none';
+    }
+   
+    function updateHighScore() {
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('highScore', highScore);
+        
+        // Track new high score
+        if (typeof gtag !== 'undefined') {
+          gtag('event', 'new_high_score', {
+            'event_category': 'Snake Game',
+            'value': score
+          });
+        }
+      }
+    }
+   
+    function draw() {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+     
+      // Draw food.
+      ctx.fillStyle = '#f00';
       ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
-    }
-
-    // Draw snakes
-    for (const playerId in players) {
-      const player = players[playerId];
-      if (!player.snake || !player.alive) continue;
-
-      // Draw each segment of the snake
-      ctx.fillStyle = player.color;
-      for (const segment of player.snake) {
-        // Smooth rendering with anti-aliasing
-        ctx.fillRect(Math.round(segment.x * gridSize), Math.round(segment.y * gridSize), gridSize, gridSize);
+     
+      // Draw snake. (Now using CrazyGames purple.)
+      ctx.fillStyle = '#9b59b6';
+      for (let part of snake) {
+        ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize, gridSize);
       }
-
-      // Draw player name above their snake if it's alive
-      if (player.snake.length > 0) {
-        const head = player.snake[0];
-        ctx.fillStyle = player.color;
-        ctx.font = "12px Courier New";
-        ctx.fillText(player.name, head.x * gridSize - 10, head.y * gridSize - 5);
+     
+      // Draw HUD.
+      ctx.fillStyle = '#00E8FF';
+      ctx.font = "16px Courier New";
+      ctx.fillText(`Score: ${score}`, 10, canvas.height - 10);
+      ctx.fillText(`Lives: ${lives}`, 100, canvas.height - 10);
+      ctx.fillText(`Level: ${level}`, 180, canvas.height - 10);
+      ctx.fillText(`High Score: ${highScore}`, 280, canvas.height - 10);
+      if (paused && !overlayMessage) {
+        ctx.fillText(`PAUSED`, 420, canvas.height - 10);
       }
     }
-
-    // Draw game info
-    ctx.fillStyle = '#00E8FF';
-    ctx.font = "16px Courier New";
-
-    // Game state
-    let statusText = started ? (paused ? "PAUSED" : "PLAYING") : "WAITING";
-    ctx.fillText(`Status: ${statusText}`, 10, canvas.height - 10);
-
-    // Player score
-    if (myPlayerId && players[myPlayerId]) {
-      ctx.fillText(`Score: ${players[myPlayerId].score || 0}`, 150, canvas.height - 10);
-    }
-
-    // Player count
-    ctx.fillText(`Players: ${Object.keys(players).length}`, 250, canvas.height - 10);
-
-    // Controls hint
-    ctx.fillText("Arrows: Move  P: Pause", 350, canvas.height - 10);
-  }
-
-  // Update players list display
-  function updatePlayersList() {
-    playerCountElem.textContent = Object.keys(players).length;
-
-    // Update speed control
-    const speedControl = document.getElementById('speedControl');
-    speedControl.value = speed;
-
-    // Update player colors display
-    playerColorsElem.innerHTML = '';
-    for (const playerId in players) {
-      const player = players[playerId];
-      const playerDiv = document.createElement('div');
-      playerDiv.className = 'player-color';
-
-      const colorBox = document.createElement('div');
-      colorBox.className = 'color-box';
-      colorBox.style.backgroundColor = player.color;
-
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = `${player.name}: ${player.score || 0}`;
-
-      playerDiv.appendChild(colorBox);
-      playerDiv.appendChild(nameSpan);
-      playerColorsElem.appendChild(playerDiv);
-    }
-  }
-</script>
+   
+    // Handle keyboard input.
+    document.addEventListener('keydown', e => {
+      if (e.key === ' ' || e.key.toLowerCase() === 'p') {
+        paused = !paused;
+        if (!started) started = true;
+        return;
+      }
+      if (!started) started = true;
+      switch (e.key) {
+        case 'ArrowUp':
+          if (velocity.y === 0) velocity = { x: 0, y: -1 };
+          break;
+        case 'ArrowDown':
+          if (velocity.y === 0) velocity = { x: 0, y: 1 };
+          break;
+        case 'ArrowLeft':
+          if (velocity.x === 0) velocity = { x: -1, y: 0 };
+          break;
+        case 'ArrowRight':
+          if (velocity.x === 0) velocity = { x: 1, y: 0 };
+          break;
+      }
+    });
+   
+    // Request fullscreen when the canvas is clicked.
+    canvas.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        canvas.requestFullscreen().catch(err => {
+          console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+        });
+      }
+    });
+   
+    // Recalculate canvas size when switching fullscreen or upon window resize.
+    document.addEventListener("fullscreenchange", updateCanvasSize);
+    window.addEventListener("resize", updateCanvasSize);
+   
+    // Start the game loop.
+    initGame();
+  </script>
+ 
+  <!-- CrazyGames API script integration (if applicable) -->
+  <script src="https://web-crazygames.com/cg.js"></script>
 </body>
 </html>
